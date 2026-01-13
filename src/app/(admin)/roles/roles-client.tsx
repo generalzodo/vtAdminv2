@@ -30,6 +30,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SuperAdminGate } from '@/components/auth/permission-gate';
+import { useIsSuperAdmin } from '@/hooks/use-permissions';
 
 interface Role {
   _id: string;
@@ -74,6 +76,7 @@ export function RolesClient() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
+  const isSuperAdmin = useIsSuperAdmin();
 
   useEffect(() => {
     fetchRoles();
@@ -203,6 +206,18 @@ export function RolesClient() {
     });
   };
 
+  const handleSelectAllPermissions = (checked: boolean) => {
+    const allPermissionNames = permissions.map(p => p.name);
+    setFormData(prev => ({
+      ...prev,
+      permissions: checked ? allPermissionNames : [],
+    }));
+  };
+
+  const totalPermissions = permissions.length;
+  const selectedPermissionsCount = formData.permissions.length;
+  const allSelected = selectedPermissionsCount === totalPermissions && totalPermissions > 0;
+
   const handleSubmit = async () => {
     // Validation
     const errors: Record<string, string> = {};
@@ -220,6 +235,16 @@ export function RolesClient() {
 
     setSubmitting(true);
     try {
+      if (editingRole && !editingRole._id) {
+        toast({
+          title: 'Error',
+          description: 'Role ID is missing. Please try again.',
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
+      }
+
       const url = editingRole
         ? `/api/admin/roles/${editingRole._id}`
         : '/api/admin/roles';
@@ -339,22 +364,25 @@ export function RolesClient() {
       header: 'Actions',
       cell: (row) => (
         <div className="flex items-center gap-2">
-          {!row.isSystemRole && (
+          {isSuperAdmin && (
             <>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenDialog(row)}
+                title={row.isSystemRole ? 'Edit permissions (system role)' : 'Edit role'}
               >
                 <Edit className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(row._id)}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+              {!row.isSystemRole && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(row._id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -371,10 +399,12 @@ export function RolesClient() {
               <CardTitle>Roles & Permissions</CardTitle>
               <CardDescription>Manage roles and their permissions</CardDescription>
             </div>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Role
-            </Button>
+            <SuperAdminGate>
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Role
+              </Button>
+            </SuperAdminGate>
           </div>
         </CardHeader>
         <CardContent>
@@ -439,7 +469,22 @@ export function RolesClient() {
               </div>
 
               <div>
-                <Label>Permissions</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Permissions</Label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">
+                      {selectedPermissionsCount} / {totalPermissions} selected
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSelectAllPermissions(!allSelected)}
+                    >
+                      {allSelected ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                </div>
                 <div className="mt-2 space-y-4">
                   {Object.entries(groupedPermissions).map(([category, categoryPermissions]) => {
                     const categoryName = category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
@@ -492,6 +537,13 @@ export function RolesClient() {
               </div>
             </div>
           </ScrollArea>
+          {editingRole?.isSystemRole && (
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>Note:</strong> This is a system role. You can only modify permissions. The name and description cannot be changed.
+              </p>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseDialog}>
               Cancel

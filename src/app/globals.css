@@ -192,3 +192,10 @@ body {
   fill: rgb(34 197 94);
 }
 
+/* Tawk.to chat icon styling */
+.tawk-min-chat-icon,
+.tawk-min-chat-icon-down {
+  color: green !important;
+  fill: green !important;
+}
+

@@ -8,7 +8,32 @@ interface UserPermissions {
 }
 
 /**
+ * Helper function to check if effective permissions include a specific permission
+ * Supports .manage permissions as wildcards for their category
+ */
+const checkPermissionInList = (effectivePerms: string[], permission: string): boolean => {
+  // Check if user has the permission or wildcard
+  if (effectivePerms.includes(permission) || effectivePerms.includes('*')) {
+    return true;
+  }
+
+  // Check if user has .manage permission for the category
+  // e.g., users.manage grants access to users.view, users.create, etc.
+  const permissionParts = permission.split('.');
+  if (permissionParts.length >= 2) {
+    const category = permissionParts[0];
+    const managePermission = `${category}.manage`;
+    if (effectivePerms.includes(managePermission)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
  * Hook to check if current user has a specific permission
+ * Supports .manage permissions as wildcards for their category
  */
 export function useHasPermission(permission: string): boolean {
   const [hasPermission, setHasPermission] = useState(false);
@@ -26,10 +51,9 @@ export function useHasPermission(permission: string): boolean {
           if (userPerms.isSuperAdmin) {
             setHasPermission(true);
           } else {
-            // Check if user has the permission or wildcard
+            // Check if user has the permission (including .manage wildcards)
             setHasPermission(
-              userPerms.effectivePermissions.includes(permission) ||
-              userPerms.effectivePermissions.includes('*')
+              checkPermissionInList(userPerms.effectivePermissions, permission)
             );
           }
         }

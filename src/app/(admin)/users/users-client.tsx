@@ -5,6 +5,7 @@ import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Plus, Edit, Trash2 } from 'lucide-react';
+import { PermissionGate } from '@/components/auth/permission-gate';
 import {
   Dialog,
   DialogContent,
@@ -354,20 +355,24 @@ export function UsersClient() {
 
   const actions = (row: User) => (
     <div className="flex gap-2">
-      <Button 
-        size="sm" 
-        variant="default"
-        onClick={() => handleOpenDialog(row)}
-      >
-        Edit
-      </Button>
-      <Button 
-        size="sm" 
-        variant="destructive"
-        onClick={() => handleDeleteClick(row._id)}
-      >
-        Delete
-      </Button>
+      <PermissionGate permission="users.edit">
+        <Button 
+          size="sm" 
+          variant="default"
+          onClick={() => handleOpenDialog(row)}
+        >
+          Edit
+        </Button>
+      </PermissionGate>
+      <PermissionGate permission="users.delete">
+        <Button 
+          size="sm" 
+          variant="destructive"
+          onClick={() => handleDeleteClick(row._id)}
+        >
+          Delete
+        </Button>
+      </PermissionGate>
     </div>
   );
 
@@ -381,14 +386,18 @@ export function UsersClient() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add new user
-          </Button>
+          <PermissionGate permission="users.view">
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </PermissionGate>
+          <PermissionGate permission="users.create">
+            <Button onClick={() => handleOpenDialog()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add new user
+            </Button>
+          </PermissionGate>
         </div>
       </div>
 
