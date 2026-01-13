@@ -49,14 +49,46 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    
+    // Get all withdrawals from backend
+    let allWithdrawals = data.data || [];
+    if (!Array.isArray(allWithdrawals)) {
+      allWithdrawals = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allWithdrawals = allWithdrawals.filter((withdrawal: any) => {
+        const userName = withdrawal.userId 
+          ? `${withdrawal.userId.firstName || ''} ${withdrawal.userId.lastName || ''}`.toLowerCase().trim()
+          : '';
+        const userPhone = withdrawal.userId?.phone?.toLowerCase() || '';
+        const accountNumber = (withdrawal.accountNumber || '').toLowerCase();
+        const bankName = (withdrawal.bankName || '').toLowerCase();
+        
+        return userName.includes(searchLower) ||
+               userPhone.includes(searchLower) ||
+               accountNumber.includes(searchLower) ||
+               bankName.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedWithdrawals = allWithdrawals.slice(startIndex, endIndex);
+    
     return NextResponse.json({
       success: true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: data.data?.length || 0,
-        pages: Math.ceil((data.data?.length || 0) / parseInt(limit)),
+      data: paginatedWithdrawals,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allWithdrawals.length,
+        pages: Math.ceil(allWithdrawals.length / limitNum),
       },
     });
   } catch (error) {

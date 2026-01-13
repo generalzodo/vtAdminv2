@@ -688,23 +688,35 @@ export function DashboardClient() {
               <div className="h-[300px] flex items-center justify-center">Loading...</div>
             ) : bookingsStatusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={bookingsStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
+                <BarChart data={bookingsStatusData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 13, fill: '#666' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 13, fill: '#666' }}
+                    label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { fontSize: 14, fontWeight: 600 } }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [value, 'Count']}
+                    contentStyle={{ fontSize: '14px', padding: '10px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#8884d8" 
+                    name="Bookings"
+                    radius={[4, 4, 0, 0]}
                   >
                     {bookingsStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
@@ -772,7 +784,7 @@ export function DashboardClient() {
         <Card>
           <CardHeader>
             <CardTitle>Top Performing Routes</CardTitle>
-            <CardDescription>Top 10 routes by revenue</CardDescription>
+            <CardDescription>Top 5 routes by revenue</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -782,23 +794,38 @@ export function DashboardClient() {
                 <BarChart 
                   data={topRoutesData}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                  margin={{ top: 10, right: 40, left: 140, bottom: 10 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 13, fill: '#666' }}
+                    label={{ value: 'Revenue (₦)', position: 'insideBottom', offset: -5, style: { fontSize: 14, fontWeight: 600 } }}
+                  />
                   <YAxis 
                     dataKey="route" 
                     type="category" 
-                    width={90}
-                    tick={{ fontSize: 12 }}
+                    width={130}
+                    tick={{ fontSize: 14, fill: '#333', fontWeight: 500 }}
+                    angle={0}
+                    textAnchor="end"
+                    height={60}
                   />
                   <Tooltip 
-                    formatter={(value: number) => `₦${value.toLocaleString()}`}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'Revenue') {
+                        return [`₦${value.toLocaleString()}`, 'Revenue'];
+                      }
+                      return [value, 'Bookings'];
+                    }}
                     labelFormatter={(label) => `Route: ${label}`}
+                    contentStyle={{ fontSize: '14px', padding: '10px' }}
                   />
-                  <Legend />
-                  <Bar dataKey="revenue" fill="#0088FE" name="Revenue" />
-                  <Bar dataKey="bookings" fill="#00C49F" name="Bookings" />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }}
+                  />
+                  <Bar dataKey="revenue" fill="#0088FE" name="Revenue" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="bookings" fill="#00C49F" name="Bookings" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

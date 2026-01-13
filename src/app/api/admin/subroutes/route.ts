@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '10';
+    const search = searchParams.get('search');
 
     // Backend now supports pagination
     const params = new URLSearchParams();
@@ -45,15 +46,37 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Backend now handles pagination, so return the response directly
+    // Get all subroutes from backend
+    let allSubroutes = data.data || [];
+    if (!Array.isArray(allSubroutes)) {
+      allSubroutes = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allSubroutes = allSubroutes.filter((subroute: any) => {
+        const stop = (subroute.stop || '').toLowerCase();
+        
+        return stop.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedSubroutes = allSubroutes.slice(startIndex, endIndex);
+    
     return NextResponse.json({
-      success: data.success || true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0,
-        pages: 0,
+      success: true,
+      data: paginatedSubroutes,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allSubroutes.length,
+        pages: Math.ceil(allSubroutes.length / limitNum),
       },
     });
   } catch (error) {

@@ -62,6 +62,7 @@ export function BusesClient() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   const busTypes = [
@@ -73,7 +74,7 @@ export function BusesClient() {
 
   useEffect(() => {
     fetchBuses();
-  }, [page, limit, statusFilter, typeFilter]);
+  }, [page, limit, statusFilter, typeFilter, searchTerm]);
 
   const fetchBuses = async () => {
     setLoading(true);
@@ -84,6 +85,7 @@ export function BusesClient() {
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (typeFilter !== 'all') params.append('type', typeFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/buses?${params.toString()}`);
       const data = await response.json();
@@ -411,9 +413,18 @@ interface Bus {
             data={buses}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={(row) => (
               <div className="flex gap-2">
                 <Button 

@@ -249,9 +249,18 @@ export function LocationsTab() {
         data={locations}
         loading={loading}
         pagination={pagination}
-        onPageChange={setPage}
-        onLimitChange={setLimit}
+        onPageChange={(newPage) => {
+          setPage(newPage);
+        }}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
         searchable
+        onSearch={(search) => {
+          setSearchTerm(search);
+          setPage(1); // Reset to first page when searching
+        }}
         actions={actions}
       />
 

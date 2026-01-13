@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
+    const search = searchParams.get('search');
 
     // Determine which endpoint to use based on status
     let endpoint = `${API_BASE_URL}users/agents/all`;
@@ -73,6 +74,26 @@ export async function GET(request: NextRequest) {
       filteredAgents = allAgents.filter((agent: any) => {
         const agentStatus = agent.agentStatus || agent.status;
         return agentStatus === 'approved' || agentStatus === 'active';
+      });
+    }
+    
+    // Apply search filter
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filteredAgents = filteredAgents.filter((agent: any) => {
+        const firstName = (agent.firstName || '').toLowerCase();
+        const lastName = (agent.lastName || '').toLowerCase();
+        const email = (agent.email || '').toLowerCase();
+        const phone = (agent.phone || '').toLowerCase();
+        const businessName = (agent.businessName || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        return firstName.includes(searchLower) ||
+               lastName.includes(searchLower) ||
+               fullName.includes(searchLower) ||
+               email.includes(searchLower) ||
+               phone.includes(searchLower) ||
+               businessName.includes(searchLower);
       });
     }
 

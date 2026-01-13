@@ -88,13 +88,14 @@ export function SubRoutesClient() {
     times: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchSubroutes();
     fetchLocations();
     fetchRoutes();
-  }, [page, limit]);
+  }, [page, limit, searchTerm]);
 
   const fetchLocations = async () => {
     try {
@@ -132,7 +133,12 @@ export function SubRoutesClient() {
   const fetchSubroutes = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/subroutes?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      if (searchTerm) params.append('search', searchTerm);
+      const response = await fetch(`/api/admin/subroutes?${params.toString()}`);
       const data = await response.json();
       if (data.success) {
         setSubroutes(data.data || []);
@@ -460,9 +466,18 @@ export function SubRoutesClient() {
             data={subroutes}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
           />
         </CardContent>

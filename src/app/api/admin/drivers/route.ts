@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '10';
     const status = searchParams.get('status');
     const state = searchParams.get('state');
+    const search = searchParams.get('search');
 
     const params = new URLSearchParams({ page, limit });
     if (status) params.append('status', status);
@@ -45,14 +46,44 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    
+    // Get all drivers from backend
+    let allDrivers = data.data || [];
+    if (!Array.isArray(allDrivers)) {
+      allDrivers = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allDrivers = allDrivers.filter((driver: any) => {
+        const firstName = (driver.firstName || '').toLowerCase();
+        const lastName = (driver.lastName || '').toLowerCase();
+        const phone = (driver.phone || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        return firstName.includes(searchLower) ||
+               lastName.includes(searchLower) ||
+               fullName.includes(searchLower) ||
+               phone.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedDrivers = allDrivers.slice(startIndex, endIndex);
+    
     return NextResponse.json({
       success: true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: data.data?.length || 0,
-        pages: Math.ceil((data.data?.length || 0) / parseInt(limit)),
+      data: paginatedDrivers,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allDrivers.length,
+        pages: Math.ceil(allDrivers.length / limitNum),
       },
     });
   } catch (error) {

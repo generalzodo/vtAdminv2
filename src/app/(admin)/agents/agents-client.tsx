@@ -74,6 +74,7 @@ export function AgentsClient() {
   const [idCardDialogOpen, setIdCardDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function AgentsClient() {
       fetchAgents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, activeTab]);
+  }, [page, limit, activeTab, searchTerm]);
 
   const fetchPendingAgents = async () => {
     setLoading(true);
@@ -125,6 +126,11 @@ export function AgentsClient() {
       // Add status filter based on active tab
       if (activeTab === 'active') {
         url += '&status=approved';
+      }
+      
+      // Add search parameter
+      if (searchTerm) {
+        url += `&search=${encodeURIComponent(searchTerm)}`;
       }
       
       const response = await fetch(url);
@@ -557,9 +563,18 @@ export function AgentsClient() {
                 data={agents}
                 loading={loading}
                 pagination={pagination}
-                onPageChange={setPage}
-                onLimitChange={setLimit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                }}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
                 searchable
+                onSearch={(search) => {
+                  setSearchTerm(search);
+                  setPage(1); // Reset to first page when searching
+                }}
                 actions={actions}
               />
             </TabsContent>
@@ -569,9 +584,18 @@ export function AgentsClient() {
                 data={agents}
                 loading={loading}
                 pagination={pagination}
-                onPageChange={setPage}
-                onLimitChange={setLimit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                }}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
                 searchable
+                onSearch={(search) => {
+                  setSearchTerm(search);
+                  setPage(1); // Reset to first page when searching
+                }}
                 actions={actions}
               />
             </TabsContent>

@@ -54,15 +54,47 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Backend now handles pagination, so return the response directly
+    // Get all trips from backend
+    let allTrips = data.data || [];
+    if (!Array.isArray(allTrips)) {
+      allTrips = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allTrips = allTrips.filter((trip: any) => {
+        const title = (trip.title || '').toLowerCase();
+        const tripDate = (trip.tripDate || '').toLowerCase();
+        const time = (trip.time || '').toLowerCase();
+        const busNo = (trip.busNo || '').toLowerCase();
+        const routeTitle = typeof trip.route === 'object' && trip.route?.title 
+          ? trip.route.title.toLowerCase() 
+          : '';
+        
+        return title.includes(searchLower) ||
+               tripDate.includes(searchLower) ||
+               time.includes(searchLower) ||
+               busNo.includes(searchLower) ||
+               routeTitle.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedTrips = allTrips.slice(startIndex, endIndex);
+    
     return NextResponse.json({
-      success: data.success || true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0,
-        pages: 0,
+      success: true,
+      data: paginatedTrips,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allTrips.length,
+        pages: Math.ceil(allTrips.length / limitNum),
       },
     });
   } catch (error) {

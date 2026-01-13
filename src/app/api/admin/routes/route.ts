@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '10';
     const origin = searchParams.get('origin');
     const destination = searchParams.get('destination');
+    const search = searchParams.get('search');
 
     // Backend now supports pagination
     const params = new URLSearchParams();
@@ -49,15 +50,43 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Backend now handles pagination, so return the response directly
+    // Get all routes from backend
+    let allRoutes = data.data || [];
+    if (!Array.isArray(allRoutes)) {
+      allRoutes = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allRoutes = allRoutes.filter((route: any) => {
+        const title = (route.title || '').toLowerCase();
+        const origin = (route.origin || '').toLowerCase();
+        const destination = (route.destination || '').toLowerCase();
+        const fullRoute = `${origin} - ${destination}`.toLowerCase();
+        
+        return title.includes(searchLower) ||
+               origin.includes(searchLower) ||
+               destination.includes(searchLower) ||
+               fullRoute.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedRoutes = allRoutes.slice(startIndex, endIndex);
+    
     return NextResponse.json({
-      success: data.success || true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0,
-        pages: 0,
+      success: true,
+      data: paginatedRoutes,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allRoutes.length,
+        pages: Math.ceil(allRoutes.length / limitNum),
       },
     });
   } catch (error) {

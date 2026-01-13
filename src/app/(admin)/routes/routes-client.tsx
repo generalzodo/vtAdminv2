@@ -462,6 +462,7 @@ export function RoutesClient() {
   const [checkAllStatus, setCheckAllStatus] = useState(false);
   const [originFilter, setOriginFilter] = useState<string>('all');
   const [destinationFilter, setDestinationFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewStopsDialogOpen, setViewStopsDialogOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -491,11 +492,11 @@ export function RoutesClient() {
   useEffect(() => {
     // Reset to first page when filters change
     setPage(1);
-  }, [originFilter, destinationFilter]);
+  }, [originFilter, destinationFilter, searchTerm]);
 
   useEffect(() => {
     fetchRoutes();
-  }, [page, limit, originFilter, destinationFilter]);
+  }, [page, limit, originFilter, destinationFilter, searchTerm]);
 
   useEffect(() => {
     fetchLocations();
@@ -545,6 +546,7 @@ export function RoutesClient() {
       });
       if (originFilter !== 'all') params.append('origin', originFilter);
       if (destinationFilter !== 'all') params.append('destination', destinationFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/routes?${params.toString()}`);
       const data = await response.json();
@@ -1002,9 +1004,18 @@ export function RoutesClient() {
             data={routes}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
           />
         </CardContent>

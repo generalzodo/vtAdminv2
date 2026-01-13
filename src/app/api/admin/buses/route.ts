@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '10';
     const status = searchParams.get('status');
     const type = searchParams.get('type');
+    const search = searchParams.get('search');
 
     // Backend now supports pagination
     const params = new URLSearchParams();
@@ -49,15 +50,38 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Backend now handles pagination, so return the response directly
+    // Get all buses from backend
+    let allBuses = data.data || [];
+    if (!Array.isArray(allBuses)) {
+      allBuses = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allBuses = allBuses.filter((bus: any) => {
+        const title = (bus.title || '').toLowerCase();
+        const busType = (bus.type || '').toLowerCase();
+        
+        return title.includes(searchLower) || busType.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedBuses = allBuses.slice(startIndex, endIndex);
+    
     return NextResponse.json({
-      success: data.success || true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0,
-        pages: 0,
+      success: true,
+      data: paginatedBuses,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allBuses.length,
+        pages: Math.ceil(allBuses.length / limitNum),
       },
     });
   } catch (error) {

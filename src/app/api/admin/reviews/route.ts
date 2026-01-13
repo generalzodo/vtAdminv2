@@ -14,7 +14,13 @@ export async function GET(request: NextRequest) {
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '10';
 
-    const response = await fetch(`${API_BASE_URL}reviews?${new URLSearchParams({ page, limit }).toString()}`, {
+    const params = new URLSearchParams({ page, limit });
+    if (status) params.append('status', status);
+    if (rating) params.append('rating', rating);
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    
+    const response = await fetch(`${API_BASE_URL}reviews?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -39,14 +45,46 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    
+    // Get all reviews from backend
+    let allReviews = data.data || [];
+    if (!Array.isArray(allReviews)) {
+      allReviews = [];
+    }
+    
+    // Apply client-side search filter if provided
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      allReviews = allReviews.filter((review: any) => {
+        const comment = (review.comment || '').toLowerCase();
+        const userName = review.userId 
+          ? `${review.userId.firstName || ''} ${review.userId.lastName || ''}`.toLowerCase().trim()
+          : '';
+        const userEmail = review.userId?.email?.toLowerCase() || '';
+        const bookingId = review.bookingId?.bookingId?.toLowerCase() || '';
+        
+        return comment.includes(searchLower) ||
+               userName.includes(searchLower) ||
+               userEmail.includes(searchLower) ||
+               bookingId.includes(searchLower);
+      });
+    }
+    
+    // Handle pagination for filtered results
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedReviews = allReviews.slice(startIndex, endIndex);
+    
     return NextResponse.json({
       success: true,
-      data: data.data || [],
-      pagination: data.pagination || {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: data.data?.length || 0,
-        pages: Math.ceil((data.data?.length || 0) / parseInt(limit)),
+      data: paginatedReviews,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: allReviews.length,
+        pages: Math.ceil(allReviews.length / limitNum),
       },
     });
   } catch (error) {

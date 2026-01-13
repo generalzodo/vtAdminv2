@@ -93,6 +93,7 @@ export function UsersClient() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [stateFilter, setStateFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
   const [bulkStatusValue, setBulkStatusValue] = useState<string>('');
@@ -101,7 +102,7 @@ export function UsersClient() {
 
   useEffect(() => {
     fetchUsers();
-  }, [page, limit, statusFilter, typeFilter, stateFilter]);
+  }, [page, limit, statusFilter, typeFilter, stateFilter, searchTerm]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -113,6 +114,7 @@ export function UsersClient() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (typeFilter !== 'all') params.append('type', typeFilter);
       if (stateFilter !== 'all') params.append('state', stateFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/users?${params.toString()}`);
       const data = await response.json();
@@ -437,9 +439,18 @@ export function UsersClient() {
             data={users}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
             selectable
             selectedRows={selectedUsers}

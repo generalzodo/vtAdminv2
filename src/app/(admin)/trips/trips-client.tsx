@@ -123,13 +123,14 @@ export function TripsClient() {
     vehicleNo: '',
   });
   const [onboardingAll, setOnboardingAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTrips();
     fetchRoutes();
     fetchDrivers();
-  }, [page, limit, statusFilter, routeFilter, fromDateFilter, toDateFilter]);
+  }, [page, limit, statusFilter, routeFilter, fromDateFilter, toDateFilter, searchTerm]);
 
   const fetchRoutes = async () => {
     try {
@@ -183,6 +184,7 @@ export function TripsClient() {
         toDate.setHours(23, 59, 59, 999);
         params.append('to', toDate.toISOString());
       }
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/trips?${params.toString()}`);
       if (!response.ok) {
@@ -937,9 +939,18 @@ export function TripsClient() {
             data={trips}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
           />
         </CardContent>

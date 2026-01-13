@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const type = searchParams.get('type');
     const state = searchParams.get('state');
+    const search = searchParams.get('search');
 
     // Fetch all users to filter out admin/agent users properly
     // The backend doesn't support type filtering, so we need to fetch and filter server-side
@@ -75,6 +76,24 @@ export async function GET(request: NextRequest) {
       filteredUsers = filteredUsers.filter((user: any) => 
         (user.state || '').toLowerCase() === state.toLowerCase()
       );
+    }
+    
+    // Apply search filter
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filteredUsers = filteredUsers.filter((user: any) => {
+        const firstName = (user.firstName || '').toLowerCase();
+        const lastName = (user.lastName || '').toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        const phone = (user.phone || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        return firstName.includes(searchLower) ||
+               lastName.includes(searchLower) ||
+               fullName.includes(searchLower) ||
+               email.includes(searchLower) ||
+               phone.includes(searchLower);
+      });
     }
     
     // Handle server-side pagination for filtered results

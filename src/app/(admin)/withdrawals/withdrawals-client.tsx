@@ -44,10 +44,11 @@ export function WithdrawalsClient() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fromDateFilter, setFromDateFilter] = useState<string>('');
   const [toDateFilter, setToDateFilter] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     fetchWithdrawals();
-  }, [page, limit, statusFilter, fromDateFilter, toDateFilter]);
+  }, [page, limit, statusFilter, fromDateFilter, toDateFilter, searchTerm]);
 
   const fetchWithdrawals = async () => {
     setLoading(true);
@@ -59,6 +60,7 @@ export function WithdrawalsClient() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (fromDateFilter) params.append('from', fromDateFilter);
       if (toDateFilter) params.append('to', toDateFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/withdrawals?${params.toString()}`);
       const data = await response.json();
@@ -215,9 +217,18 @@ export function WithdrawalsClient() {
             data={withdrawals}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
           />
         </CardContent>

@@ -98,12 +98,13 @@ export function AdminUsersClient() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
     fetchRoles();
-  }, [page, limit, roleFilter, statusFilter]);
+  }, [page, limit, roleFilter, statusFilter, searchTerm]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -114,6 +115,7 @@ export function AdminUsersClient() {
       });
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/admin-users?${params.toString()}`);
       const data = await response.json();
@@ -615,9 +617,18 @@ export function AdminUsersClient() {
             data={users}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
           />
         </CardContent>
       </Card>

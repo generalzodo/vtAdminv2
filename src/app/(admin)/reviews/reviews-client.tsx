@@ -46,10 +46,11 @@ export function ReviewsClient() {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     fetchReviews();
-  }, [page, limit, statusFilter, ratingFilter, fromDate, toDate]);
+  }, [page, limit, statusFilter, ratingFilter, fromDate, toDate, searchTerm]);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -62,6 +63,7 @@ export function ReviewsClient() {
       if (ratingFilter !== 'all') params.append('rating', ratingFilter);
       if (fromDate) params.append('from', fromDate);
       if (toDate) params.append('to', toDate);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/reviews?${params.toString()}`);
       const data = await response.json();
@@ -262,9 +264,18 @@ export function ReviewsClient() {
             data={reviews}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
           />
         </CardContent>
       </Card>

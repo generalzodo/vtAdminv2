@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
     console.log('Fetching dashboard stats from:', url);
     
     // Add timeout to prevent Vercel 504 errors (Vercel has 10s timeout on Hobby, 60s on Pro)
-    // Set timeout to 8 seconds to give some buffer
+    // Set timeout to 60 seconds (1 minute) to allow for large dataset processing
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     try {
       const response = await fetch(url, {
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       
       // Handle timeout/abort errors
       if (fetchError.name === 'AbortError' || controller.signal.aborted) {
-        console.error('Dashboard API request timed out after 8 seconds');
+        console.error('Dashboard API request timed out after 60 seconds');
         return NextResponse.json({ 
           error: 'Request timeout: The dashboard data is taking too long to load. Please try again or contact support if this persists.'
         }, { status: 504 });

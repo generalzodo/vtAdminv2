@@ -949,7 +949,10 @@ export function BookingsClient() {
                 onPageChange={setPage}
                 onLimitChange={setLimit}
                 searchable={true}
-                onSearch={setSearchTerm}
+                onSearch={(search) => {
+                  setSearchTerm(search);
+                  setPage(1); // Reset to first page when searching
+                }}
                 actions={actions}
                 selectable
                 selectedRows={selectedBookings}
@@ -1079,7 +1082,10 @@ export function BookingsClient() {
                 onPageChange={setPage}
                 onLimitChange={setLimit}
                 searchable={true}
-                onSearch={setSearchTerm}
+                onSearch={(search) => {
+                  setSearchTerm(search);
+                  setPage(1); // Reset to first page when searching
+                }}
                 actions={actions}
                 selectable
                 selectedRows={selectedBookings}
@@ -1209,7 +1215,10 @@ export function BookingsClient() {
                 onPageChange={setPage}
                 onLimitChange={setLimit}
                 searchable={true}
-                onSearch={setSearchTerm}
+                onSearch={(search) => {
+                  setSearchTerm(search);
+                  setPage(1); // Reset to first page when searching
+                }}
                 actions={actions}
                 selectable
                 selectedRows={selectedBookings}

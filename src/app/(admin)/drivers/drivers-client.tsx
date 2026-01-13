@@ -70,11 +70,12 @@ export function DriversClient() {
     state: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDrivers();
-  }, [page, limit, statusFilter, stateFilter]);
+  }, [page, limit, statusFilter, stateFilter, searchTerm]);
 
   const fetchDrivers = async () => {
     setLoading(true);
@@ -85,6 +86,7 @@ export function DriversClient() {
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (stateFilter !== 'all') params.append('state', stateFilter);
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/drivers?${params.toString()}`);
       const data = await response.json();
@@ -356,9 +358,18 @@ export function DriversClient() {
             data={drivers}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
             actions={actions}
           />
         </CardContent>

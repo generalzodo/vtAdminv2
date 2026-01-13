@@ -72,12 +72,13 @@ export function RolesClient() {
     permissions: [] as string[],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchRoles();
     fetchPermissions();
-  }, [page, limit]);
+  }, [page, limit, searchTerm]);
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -86,6 +87,7 @@ export function RolesClient() {
         page: page.toString(),
         limit: limit.toString(),
       });
+      if (searchTerm) params.append('search', searchTerm);
 
       const response = await fetch(`/api/admin/roles?${params.toString()}`);
       const data = await response.json();
@@ -381,9 +383,18 @@ export function RolesClient() {
             data={roles}
             loading={loading}
             pagination={pagination}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
             searchable={true}
+            onSearch={(search) => {
+              setSearchTerm(search);
+              setPage(1); // Reset to first page when searching
+            }}
           />
         </CardContent>
       </Card>
