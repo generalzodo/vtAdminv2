@@ -20,14 +20,45 @@ export async function loginAction(prevState: any, formData: FormData) {
         };
     }
     
+    // Fix URL construction to handle trailing slashes
+    const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const loginUrl = `${baseUrl}/users/login`;
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/users/login`, {
+        const response = await fetch(loginUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(validatedFields.data),
         });
 
-        const result = await response.json();
+        // Handle non-JSON responses
+        let result;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                result = await response.json();
+            } catch (jsonError) {
+                console.error('Failed to parse JSON response:', jsonError);
+                const text = await response.text();
+                console.error('Response text:', text.substring(0, 200));
+                return {
+                    message: `Server error: Invalid response format (Status ${response.status})`,
+                    errors: null,
+                };
+            }
+        } else {
+            const text = await response.text();
+            console.error('Non-JSON response:', {
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                text: text.substring(0, 200)
+            });
+            return {
+                message: `Server error: ${response.status} ${response.statusText}`,
+                errors: null,
+            };
+        }
 
         if (!response.ok || !result.token) {
              return {
@@ -70,8 +101,20 @@ export async function loginAction(prevState: any, formData: FormData) {
         cookies().set('vts-user', JSON.stringify(userPayload), cookieOptions);
 
     } catch (error) {
+        // Log the actual error for debugging
+        console.error('Login error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Check if it's a network error
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            return {
+                message: 'Network error: Unable to connect to server. Please check your connection.',
+                errors: null,
+            };
+        }
+        
         return {
-            message: 'An unexpected error occurred. Please try again later.',
+            message: `An unexpected error occurred: ${errorMessage}. Please try again later.`,
             errors: null,
         };
     }
