@@ -89,6 +89,7 @@ const timeSlots = [
 function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () => void }) {
   const [subroutes, setSubroutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [subrouteDialogOpen, setSubrouteDialogOpen] = useState(false);
   const [editingSubroute, setEditingSubroute] = useState<any | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -97,31 +98,48 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
   const [locations, setLocations] = useState<Location[]>([]);
   const [formData, setFormData] = useState({
     stop: '',
-    price: '',
-    premiumPrice: '',
-    discountedPrice: '',
     times: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   useEffect(() => {
-    if (routeId) {
+    if (routeId && routeId.trim() !== '') {
       fetchSubroutes();
       fetchLocations();
+    } else {
+      setLoading(false);
+      setSubroutes([]);
     }
   }, [routeId]);
 
   const fetchSubroutes = async () => {
+    if (!routeId || routeId.trim() === '') {
+      setLoading(false);
+      setSubroutes([]);
+      setError('Route ID is missing');
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/admin/subroutes/routes/${routeId}`);
       const data = await response.json();
       if (data.success) {
         setSubroutes(data.data || []);
+        setError(null);
+      } else {
+        const errorMessage = data.error || 'Failed to fetch stops';
+        console.error('Failed to fetch subroutes:', errorMessage);
+        setSubroutes([]);
+        setError(errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error.message || 'Error fetching stops';
       console.error('Error fetching subroutes:', error);
+      setSubroutes([]);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -144,18 +162,12 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
       setEditingSubroute(subroute);
       setFormData({
         stop: subroute.stop || '',
-        price: subroute.price?.toString() || '',
-        premiumPrice: subroute.premiumPrice?.toString() || '',
-        discountedPrice: subroute.discountedPrice?.toString() || '',
         times: subroute.times?.toString() || '',
       });
     } else {
       setEditingSubroute(null);
       setFormData({
         stop: '',
-        price: '',
-        premiumPrice: '',
-        discountedPrice: '',
         times: '',
       });
     }
@@ -168,9 +180,6 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
     setEditingSubroute(null);
     setFormData({
       stop: '',
-      price: '',
-      premiumPrice: '',
-      discountedPrice: '',
       times: '',
     });
     setFormErrors({});
@@ -179,9 +188,6 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.stop) errors.stop = 'Please select subroute\'s stop';
-    if (!formData.price) errors.price = 'Please enter price';
-    if (!formData.premiumPrice) errors.premiumPrice = 'Please enter premium price';
-    if (!formData.discountedPrice) errors.discountedPrice = 'Please enter discounted price';
     if (!formData.times) errors.times = 'Please enter time difference';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -194,9 +200,6 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
     try {
       const payload: any = {
         stop: formData.stop,
-        price: parseFloat(formData.price),
-        premiumPrice: parseFloat(formData.premiumPrice),
-        discountedPrice: parseFloat(formData.discountedPrice),
         route: routeId,
         times: parseFloat(formData.times),
       };
@@ -280,11 +283,6 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
 
   const columns: Column<any>[] = [
     { key: 'stop', header: 'Stop', cell: (row) => row.stop || 'N/A' },
-    {
-      key: 'prices',
-      header: 'Prices',
-      cell: (row) => `N:${row.price || 0}, P: ${row.premiumPrice || 0}, D: ${row.discountedPrice || 0}`,
-    },
     { key: 'times', header: 'Stop time difference', cell: (row) => row.times || 'N/A' },
     { key: 'createdAt', header: 'Created on', cell: (row) => formatDate(row.createdAt) },
     {
@@ -319,6 +317,17 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
 
       {loading ? (
         <div className="text-center py-8">Loading stops...</div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button onClick={fetchSubroutes} variant="outline">
+            Retry
+          </Button>
+        </div>
+      ) : subroutes.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          No stops found for this route
+        </div>
       ) : (
         <DataTable
           columns={columns}
@@ -359,48 +368,6 @@ function ViewStopsContent({ routeId, onClose }: { routeId: string; onClose: () =
                 </SelectContent>
               </Select>
               {formErrors.stop && <p className="text-sm text-destructive">{formErrors.stop}</p>}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Basic Price *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="SubRoute Basic Price"
-                />
-                {formErrors.price && <p className="text-sm text-destructive">{formErrors.price}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="premiumPrice">Premium Price *</Label>
-                <Input
-                  id="premiumPrice"
-                  type="number"
-                  value={formData.premiumPrice}
-                  onChange={(e) => setFormData({ ...formData, premiumPrice: e.target.value })}
-                  placeholder="SubRoute Premium Price"
-                />
-                {formErrors.premiumPrice && (
-                  <p className="text-sm text-destructive">{formErrors.premiumPrice}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="discountedPrice">Discounted Price *</Label>
-                <Input
-                  id="discountedPrice"
-                  type="number"
-                  value={formData.discountedPrice}
-                  onChange={(e) => setFormData({ ...formData, discountedPrice: e.target.value })}
-                  placeholder="SubRoute Discounted Price"
-                />
-                {formErrors.discountedPrice && (
-                  <p className="text-sm text-destructive">{formErrors.discountedPrice}</p>
-                )}
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -1270,18 +1237,35 @@ export function RoutesClient() {
       </Dialog>
 
       {/* View Stops Dialog */}
-      <Dialog open={viewStopsDialogOpen} onOpenChange={setViewStopsDialogOpen}>
+      <Dialog 
+        open={viewStopsDialogOpen} 
+        onOpenChange={(open) => {
+          setViewStopsDialogOpen(open);
+          if (!open) {
+            setSelectedRouteForStops(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Stops for {selectedRouteForStops?.title}</DialogTitle>
+            <DialogTitle>Stops for {selectedRouteForStops?.title || 'Route'}</DialogTitle>
             <DialogDescription>
               View and manage stops for this route
             </DialogDescription>
           </DialogHeader>
-          <ViewStopsContent
-            routeId={selectedRouteForStops?._id || ''}
-            onClose={() => setViewStopsDialogOpen(false)}
-          />
+          {selectedRouteForStops?._id ? (
+            <ViewStopsContent
+              routeId={selectedRouteForStops._id}
+              onClose={() => {
+                setViewStopsDialogOpen(false);
+                setSelectedRouteForStops(null);
+              }}
+            />
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              No route selected
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

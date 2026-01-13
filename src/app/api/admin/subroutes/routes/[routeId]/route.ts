@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { routeId: string } }
+  { params }: { params: Promise<{ routeId: string }> | { routeId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,7 +13,15 @@ export async function GET(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE_URL}subroutes/routes/${params.routeId}`, {
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const routeId = resolvedParams.routeId;
+
+    if (!routeId) {
+      return NextResponse.json({ error: 'Route ID is required' }, { status: 400 });
+    }
+
+    const response = await fetch(`${API_BASE_URL}subroutes/routes/${routeId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
