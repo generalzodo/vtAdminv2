@@ -61,11 +61,56 @@ export function LocationsTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: '', address: '', state: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [allLocations, setAllLocations] = useState<Location[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchLocations();
-  }, [page, limit]);
+  }, []);
+
+  useEffect(() => {
+    // Reset to first page when search changes
+    setPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    // Filter and paginate locations when page, limit, or search changes
+    filterAndPaginateLocations();
+  }, [page, limit, searchTerm, allLocations]);
+
+  const filterAndPaginateLocations = () => {
+    let filteredLocations = [...allLocations];
+    
+    // Apply search filter
+    if (searchTerm && searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filteredLocations = filteredLocations.filter((location: any) => {
+        const title = (location.title || '').toLowerCase();
+        const address = (location.address || '').toLowerCase();
+        const state = (location.state || '').toLowerCase();
+        
+        return title.includes(searchLower) ||
+               address.includes(searchLower) ||
+               state.includes(searchLower);
+      });
+    }
+    
+    // Apply pagination
+    const pageNum = parseInt(page.toString());
+    const limitNum = parseInt(limit.toString());
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedLocations = filteredLocations.slice(startIndex, endIndex);
+    
+    setLocations(paginatedLocations);
+    setPagination({
+      page: pageNum,
+      limit: limitNum,
+      total: filteredLocations.length,
+      pages: Math.ceil(filteredLocations.length / limitNum),
+    });
+  };
 
   const fetchLocations = async () => {
     setLoading(true);
@@ -73,20 +118,7 @@ export function LocationsTab() {
       const response = await fetch('/api/admin/locations');
       const data = await response.json();
       if (data.success) {
-        const allLocations = data.data || [];
-        const pageNum = parseInt(page.toString());
-        const limitNum = parseInt(limit.toString());
-        const startIndex = (pageNum - 1) * limitNum;
-        const endIndex = startIndex + limitNum;
-        const paginatedLocations = allLocations.slice(startIndex, endIndex);
-        
-        setLocations(paginatedLocations);
-        setPagination({
-          page: pageNum,
-          limit: limitNum,
-          total: allLocations.length,
-          pages: Math.ceil(allLocations.length / limitNum),
-        });
+        setAllLocations(data.data || []);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);

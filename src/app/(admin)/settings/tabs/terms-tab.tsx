@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RichTextEditor } from '@/components/admin/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
 
 interface Settings {
@@ -122,14 +122,14 @@ export function TermsTab() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="terms">Terms and Conditions</Label>
-                <Textarea
-                  id="terms"
-                  value={settings.termsAndConditions || ''}
-                  onChange={(e) => setSettings({ ...settings, termsAndConditions: e.target.value })}
-                  rows={15}
-                  placeholder="Enter terms and conditions..."
-                  className="font-mono text-sm"
-                />
+                <div className="mt-2">
+                  <RichTextEditor
+                    value={settings.termsAndConditions || ''}
+                    onChange={(value) => setSettings({ ...settings, termsAndConditions: value })}
+                    placeholder="Enter terms and conditions..."
+                    className="bg-white"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -146,14 +146,14 @@ export function TermsTab() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="ticketTerms">Ticket Terms</Label>
-                <Textarea
-                  id="ticketTerms"
-                  value={settings.ticketTerms || ''}
-                  onChange={(e) => setSettings({ ...settings, ticketTerms: e.target.value })}
-                  rows={15}
-                  placeholder="Enter ticket terms..."
-                  className="font-mono text-sm"
-                />
+                <div className="mt-2">
+                  <RichTextEditor
+                    value={settings.ticketTerms || ''}
+                    onChange={(value) => setSettings({ ...settings, ticketTerms: value })}
+                    placeholder="Enter ticket terms..."
+                    className="bg-white"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

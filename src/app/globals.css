@@ -133,3 +133,62 @@ body {
   opacity: 1;
 }
 
+/* Quill Editor Styles */
+.ql-container {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  min-height: 300px;
+}
+
+.ql-editor {
+  min-height: 300px;
+}
+
+.ql-editor.ql-blank::before {
+  color: rgb(156 163 175);
+  font-style: normal;
+}
+
+.ql-toolbar {
+  border-top: 1px solid rgb(229 231 235);
+  border-left: 1px solid rgb(229 231 235);
+  border-right: 1px solid rgb(229 231 235);
+  border-bottom: none;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: rgb(249 250 251);
+}
+
+.ql-container {
+  border-bottom: 1px solid rgb(229 231 235);
+  border-left: 1px solid rgb(229 231 235);
+  border-right: 1px solid rgb(229 231 235);
+  border-top: none;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.ql-toolbar .ql-stroke {
+  stroke: rgb(75 85 99);
+}
+
+.ql-toolbar .ql-fill {
+  fill: rgb(75 85 99);
+}
+
+.ql-toolbar button:hover,
+.ql-toolbar button:focus,
+.ql-toolbar button.ql-active {
+  color: rgb(34 197 94);
+}
+
+.ql-toolbar button:hover .ql-stroke,
+.ql-toolbar button:focus .ql-stroke,
+.ql-toolbar button.ql-active .ql-stroke {
+  stroke: rgb(34 197 94);
+}
+
+.ql-toolbar button:hover .ql-fill,
+.ql-toolbar button:focus .ql-fill,
+.ql-toolbar button.ql-active .ql-fill {
+  fill: rgb(34 197 94);
+}
+
