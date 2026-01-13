@@ -20,15 +20,37 @@ export async function loginAction(prevState: any, formData: FormData) {
         };
     }
     
+    // Validate API_BASE_URL is configured
+    if (!API_BASE_URL || API_BASE_URL === 'undefined') {
+        console.error('API_BASE_URL is not configured. Please set NEXT_PUBLIC_API_BASE_URL environment variable.');
+        return {
+            message: 'Server configuration error: API URL not set. Please contact support.',
+            errors: null,
+        };
+    }
+    
     // Fix URL construction to handle trailing slashes
     const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
     const loginUrl = `${baseUrl}/users/login`;
+    
+    // Log for debugging (only in development or when explicitly enabled)
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV) {
+        console.log('Login attempt:', {
+            apiBaseUrl: API_BASE_URL,
+            loginUrl,
+            hasEnvVar: !!process.env.NEXT_PUBLIC_API_BASE_URL,
+            vercelEnv: process.env.VERCEL_ENV,
+        });
+    }
     
     try {
         const response = await fetch(loginUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(validatedFields.data),
+            // Add cache and revalidate options for Vercel
+            cache: 'no-store',
+            next: { revalidate: 0 },
         });
 
         // Handle non-JSON responses
@@ -75,14 +97,18 @@ export async function loginAction(prevState: any, formData: FormData) {
             };
         }
 
+        // Set cookies - In Next.js 16, cookies() is async and must be awaited
+        const cookieStore = await cookies();
+        
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: '/',
+            sameSite: 'lax' as const,
         };
 
-        cookies().set('vts-token', result.token, cookieOptions);
+        cookieStore.set('vts-token', result.token, cookieOptions);
 
         const userPayload = {
             id: result.user._id,
@@ -98,7 +124,7 @@ export async function loginAction(prevState: any, formData: FormData) {
             commissionRate: result.user.commissionRate || null,
         };
 
-        cookies().set('vts-user', JSON.stringify(userPayload), cookieOptions);
+        cookieStore.set('vts-user', JSON.stringify(userPayload), cookieOptions);
 
     } catch (error) {
         // Log the actual error for debugging
@@ -123,8 +149,9 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function logoutAction() {
-    cookies().delete('vts-token');
-    cookies().delete('vts-user');
+    const cookieStore = await cookies();
+    cookieStore.delete('vts-token');
+    cookieStore.delete('vts-user');
     redirect('/login');
 }
 
