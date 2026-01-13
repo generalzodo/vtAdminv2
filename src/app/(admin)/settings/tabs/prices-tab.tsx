@@ -46,11 +46,58 @@ export function PricesTab() {
   const [editingPrice, setEditingPrice] = useState<Price | null>(null);
   const [formData, setFormData] = useState({ price: '', premiumPrice: '', discountedPrice: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [allPrices, setAllPrices] = useState<Price[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPrices();
-  }, [page, limit]);
+  }, []);
+
+  useEffect(() => {
+    // Reset to first page when search changes
+    setPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    // Filter and paginate prices when page, limit, or search changes
+    filterAndPaginatePrices();
+  }, [page, limit, searchTerm, allPrices]);
+
+  const filterAndPaginatePrices = () => {
+    let filteredPrices = [...allPrices];
+    
+    // Apply search filter
+    if (searchTerm && searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filteredPrices = filteredPrices.filter((price: any) => {
+        const origin = (price.origin || '').toLowerCase();
+        const destination = (price.destination || '').toLowerCase();
+        const route = `${origin} - ${destination}`.toLowerCase();
+        const busType = (price.bus?.title || price.bus?.type || '').toLowerCase();
+        
+        return origin.includes(searchLower) ||
+               destination.includes(searchLower) ||
+               route.includes(searchLower) ||
+               busType.includes(searchLower);
+      });
+    }
+    
+    // Apply pagination
+    const pageNum = parseInt(page.toString());
+    const limitNum = parseInt(limit.toString());
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedPrices = filteredPrices.slice(startIndex, endIndex);
+    
+    setPrices(paginatedPrices);
+    setPagination({
+      page: pageNum,
+      limit: limitNum,
+      total: filteredPrices.length,
+      pages: Math.ceil(filteredPrices.length / limitNum),
+    });
+  };
 
   const fetchPrices = async () => {
     setLoading(true);
@@ -58,20 +105,7 @@ export function PricesTab() {
       const response = await fetch('/api/admin/prices');
       const data = await response.json();
       if (data.success) {
-        const allPrices = data.data || [];
-        const pageNum = parseInt(page.toString());
-        const limitNum = parseInt(limit.toString());
-        const startIndex = (pageNum - 1) * limitNum;
-        const endIndex = startIndex + limitNum;
-        const paginatedPrices = allPrices.slice(startIndex, endIndex);
-        
-        setPrices(paginatedPrices);
-        setPagination({
-          page: pageNum,
-          limit: limitNum,
-          total: allPrices.length,
-          pages: Math.ceil(allPrices.length / limitNum),
-        });
+        setAllPrices(data.data || []);
       }
     } catch (error) {
       console.error('Error fetching prices:', error);
