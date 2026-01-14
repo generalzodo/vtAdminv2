@@ -19,10 +19,19 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get('to');
     const search = searchParams.get('search');
 
-    // Backend now supports pagination
+    // Backend supports pagination; only apply client-side filtering when `search` is provided.
     const params = new URLSearchParams();
-    params.append('page', page);
-    params.append('limit', limit);
+    const isSearching = Boolean(search && search.trim());
+
+    // If searching, fetch a larger set once then paginate locally.
+    // (Backend doesn't currently support `search`.)
+    if (isSearching) {
+      params.append('page', '1');
+      params.append('limit', '10000');
+    } else {
+      params.append('page', page);
+      params.append('limit', limit);
+    }
     if (status) params.append('status', status);
     if (route) params.append('route', route);
     if (from) params.append('from', from);
@@ -54,40 +63,50 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    
-    // Get all trips from backend
-    let allTrips = data.data || [];
-    if (!Array.isArray(allTrips)) {
-      allTrips = [];
-    }
-    
-    // Apply client-side search filter if provided
-    if (search && search.trim()) {
-      const searchLower = search.toLowerCase().trim();
-      allTrips = allTrips.filter((trip: any) => {
-        const title = (trip.title || '').toLowerCase();
-        const tripDate = (trip.tripDate || '').toLowerCase();
-        const time = (trip.time || '').toLowerCase();
-        const busNo = (trip.busNo || '').toLowerCase();
-        const routeTitle = typeof trip.route === 'object' && trip.route?.title 
-          ? trip.route.title.toLowerCase() 
-          : '';
-        
-        return title.includes(searchLower) ||
-               tripDate.includes(searchLower) ||
-               time.includes(searchLower) ||
-               busNo.includes(searchLower) ||
-               routeTitle.includes(searchLower);
+
+    // If not searching, passthrough backend pagination to avoid double-pagination bugs.
+    if (!isSearching) {
+      return NextResponse.json({
+        success: true,
+        data: Array.isArray(data.data) ? data.data : [],
+        pagination: data.pagination || {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: Array.isArray(data.data) ? data.data.length : 0,
+          pages: 1,
+        },
       });
     }
-    
-    // Handle pagination for filtered results
+
+    // Searching: filter locally and paginate the filtered results.
+    let allTrips = Array.isArray(data.data) ? data.data : [];
+    const searchLower = (search || '').toLowerCase().trim();
+
+    allTrips = allTrips.filter((trip: any) => {
+      const title = (trip.title || '').toLowerCase();
+      const tripDate = (trip.tripDate || '').toLowerCase();
+      const time = (trip.time || '').toLowerCase();
+      const busNo = (trip.busNo || '').toLowerCase();
+      const routeTitle =
+        typeof trip.route === 'object' && trip.route?.title
+          ? String(trip.route.title).toLowerCase()
+          : '';
+
+      return (
+        title.includes(searchLower) ||
+        tripDate.includes(searchLower) ||
+        time.includes(searchLower) ||
+        busNo.includes(searchLower) ||
+        routeTitle.includes(searchLower)
+      );
+    });
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const startIndex = (pageNum - 1) * limitNum;
     const endIndex = startIndex + limitNum;
     const paginatedTrips = allTrips.slice(startIndex, endIndex);
-    
+
     return NextResponse.json({
       success: true,
       data: paginatedTrips,
