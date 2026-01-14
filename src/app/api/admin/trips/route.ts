@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const route = searchParams.get('route');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const search = searchParams.get('search');
 
     // Backend now supports pagination
     const params = new URLSearchParams();
