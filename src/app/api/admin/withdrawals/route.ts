@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const search = searchParams.get('search');
 
+    // The legacy backend exposes withdrawals via `users/withdrawals` (no pagination or filters).
+    // We still build params for potential future support, but the current endpoint ignores them.
     const params = new URLSearchParams();
     if (status) params.append('status', status);
     if (from) params.append('from', from);
@@ -24,7 +27,7 @@ export async function GET(request: NextRequest) {
     params.append('page', page);
     params.append('limit', limit);
 
-    const response = await fetch(`${API_BASE_URL}wallet/withdrawals?${params.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}users/withdrawals`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

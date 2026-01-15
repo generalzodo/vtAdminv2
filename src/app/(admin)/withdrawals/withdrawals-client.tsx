@@ -66,7 +66,18 @@ export function WithdrawalsClient() {
       const data = await response.json();
       if (data.success) {
         setWithdrawals(data.data || []);
-        setPagination(data.pagination || pagination);
+        // Ensure pagination always reflects the current page state, not stale state
+        const paginationData = data.pagination || {
+          page: page,
+          limit: limit,
+          total: data.data?.length || 0,
+          pages: Math.ceil((data.data?.length || 0) / limit),
+        };
+        // Always use the current page from state, not from response (which might be stale)
+        setPagination({
+          ...paginationData,
+          page: page, // Force current page state
+        });
       }
     } catch (error) {
       console.error('Error fetching withdrawals:', error);

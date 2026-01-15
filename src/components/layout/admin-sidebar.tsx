@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { usePermissions } from '@/hooks/use-permissions';
+import { usePermissions as usePermissionsContext } from '@/contexts/permissions-context';
 
 const menuItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
@@ -49,7 +49,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const [pendingAgentsCount, setPendingAgentsCount] = useState(0);
-  const { permissions, loading: permissionsLoading } = usePermissions();
+  const { permissions, loading: permissionsLoading } = usePermissionsContext();
   const isSuperAdmin = permissions?.isSuperAdmin || false;
   
   // Debug: Log super admin status

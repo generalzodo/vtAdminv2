@@ -65,13 +65,19 @@ export async function GET(request: NextRequest) {
       ? ['*'] 
       : [...(user.role?.permissions || []), ...(user.permissions || [])];
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
         isSuperAdmin,
         effectivePermissions: [...new Set(effectivePermissions)]
       }
     });
+
+    // Add cache headers to reduce redundant API calls
+    // Cache for 5 minutes - permissions don't change frequently
+    response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=60');
+    
+    return response;
   } catch (error: any) {
     console.error('Error fetching permissions:', error);
     return NextResponse.json(

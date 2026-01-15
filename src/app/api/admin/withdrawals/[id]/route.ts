@@ -16,13 +16,27 @@ export async function PATCH(
     const { id } = params;
     const body = await request.json(); // { status: 'approved' | 'rejected' }
 
-    const response = await fetch(`${API_BASE_URL}withdrawals/${id}`, {
-      method: 'PATCH',
+    // Legacy v1 behavior:
+    // - Approve:  GET users/approveTransaction/:id
+    // - Reject:   GET users/rejectTransaction/:id
+    let backendUrl: string | null = null;
+    if (body.status === 'approved') {
+      backendUrl = `${API_BASE_URL}users/approveTransaction/${id}`;
+    } else if (body.status === 'rejected') {
+      backendUrl = `${API_BASE_URL}users/rejectTransaction/${id}`;
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid status. Must be "approved" or "rejected".' },
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch(backendUrl, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

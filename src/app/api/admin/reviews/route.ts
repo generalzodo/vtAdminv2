@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '10';
+    const status = searchParams.get('status');
+    const rating = searchParams.get('rating');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    const search = searchParams.get('search');
 
     const params = new URLSearchParams({ page, limit });
     if (status) params.append('status', status);

@@ -194,7 +194,18 @@ export function TripsClient() {
       const data = await response.json();
       if (data.success) {
         setTrips(data.data || []);
-        setPagination(data.pagination || pagination);
+        // Ensure pagination always reflects the current page state, not stale state
+        const paginationData = data.pagination || {
+          page: page,
+          limit: limit,
+          total: data.data?.length || 0,
+          pages: Math.ceil((data.data?.length || 0) / limit),
+        };
+        // Always use the current page from state, not from response (which might be stale)
+        setPagination({
+          ...paginationData,
+          page: page, // Force current page state
+        });
       } else {
         throw new Error(data.error || 'Failed to fetch trips');
       }

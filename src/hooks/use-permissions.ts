@@ -105,15 +105,28 @@ export function useIsSuperAdmin(): boolean {
 
 /**
  * Hook to get all user permissions
+ * This now uses the PermissionsContext for shared state
  */
 export function usePermissions(): { permissions: UserPermissions | null; loading: boolean } {
+  // Try to use context first (if available within PermissionsProvider)
+  const context = useContext(PermissionsContext);
+  
+  // If context is available and has been initialized, use it
+  if (context && (context.permissions !== null || !context.loading)) {
+    return { permissions: context.permissions, loading: context.loading };
+  }
+  
+  // Fallback to local state if context not available (shouldn't happen in admin layout)
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const response = await fetch('/api/admin/auth/permissions');
+        const response = await fetch('/api/admin/auth/permissions', {
+          cache: 'force-cache',
+          next: { revalidate: 300 },
+        });
         if (response.ok) {
           const data = await response.json();
           setPermissions(data.data);

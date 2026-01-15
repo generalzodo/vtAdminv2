@@ -270,8 +270,23 @@ export function BookingsClient() {
           pages: 1,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching bookings:', error);
+      
+      let errorMessage = 'Failed to fetch bookings';
+      let errorDetails = '';
+      
+      if (error.message) {
+        errorMessage = error.message;
+        errorDetails = error.stack || '';
+      }
+      
+      toast({
+        title: 'Error Loading Bookings',
+        description: errorDetails || errorMessage,
+        variant: 'destructive',
+      });
+      
       setBookings([]);
       setPagination({
         page: 1,
