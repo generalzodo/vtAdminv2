@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface Column<T> {
@@ -95,14 +95,17 @@ export function DataTable<T extends Record<string, any>>({
     }
   }, [data]);
 
-  useEffect(() => {
+  const handleSearch = () => {
     if (searchable && onSearch) {
-      const timeoutId = setTimeout(() => {
-        onSearch(searchTerm);
-      }, 1800); // Increased debounce from 300ms to 800ms to reduce API calls
-      return () => clearTimeout(timeoutId);
+      onSearch(searchTerm);
     }
-  }, [searchTerm, onSearch, searchable]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   // For server-side search, use data as-is (filtering happens on server)
   const filteredData = data;
@@ -194,13 +197,18 @@ export function DataTable<T extends Record<string, any>>({
       )}
       
       {searchable && (
-        <div className="flex items-center gap-4 p-2">
+        <div className="flex items-center gap-2 p-2">
           <Input
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="max-w-sm"
           />
+          <Button onClick={handleSearch} size="default" variant="default">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
         </div>
       )}
 
