@@ -61,13 +61,27 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
   }, [permissions, isSuperAdmin, permissionsLoading]);
 
   useEffect(() => {
+    let countCache: { value: number; timestamp: number } | null = null;
+    const CACHE_DURATION = 60000; // 60 seconds client-side cache
+    
     // Fetch pending agents count
     const fetchPendingCount = async () => {
+      // Skip if we have fresh cached data (within 60 seconds)
+      if (countCache && Date.now() - countCache.timestamp < CACHE_DURATION) {
+        setPendingAgentsCount(countCache.value);
+        return;
+      }
+      
       try {
-        const response = await fetch('/api/admin/agents/pending-count');
+        // Server already sets cache headers
+        const response = await fetch('/api/admin/agents/pending-count', {
+          credentials: 'include',
+        });
         if (response.ok) {
           const data = await response.json();
-          setPendingAgentsCount(data.count || 0);
+          const count = data.count || 0;
+          setPendingAgentsCount(count);
+          countCache = { value: count, timestamp: Date.now() };
         }
       } catch (error) {
         console.error('Error fetching pending agents count:', error);
@@ -75,8 +89,8 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
     };
 
     fetchPendingCount();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchPendingCount, 30000);
+    // Refresh every 2 minutes (120 seconds) instead of 30 seconds - reduces requests by 75%
+    const interval = setInterval(fetchPendingCount, 120000);
 
     return () => clearInterval(interval);
   }, []);

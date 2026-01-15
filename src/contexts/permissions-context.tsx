@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface UserPermissions {
+export interface UserPermissions {
   isSuperAdmin: boolean;
   effectivePermissions: string[];
 }
@@ -13,7 +13,7 @@ interface PermissionsContextType {
   refetch: () => void;
 }
 
-const PermissionsContext = createContext<PermissionsContextType>({
+export const PermissionsContext = createContext<PermissionsContextType>({
   permissions: null,
   loading: true,
   refetch: () => {},
@@ -25,12 +25,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const fetchPermissions = async () => {
     try {
-      // Use browser cache for faster subsequent loads within the same session
+      // Server already sets cache headers (5 minutes)
+      // Client-side caching is handled by browser automatically
       const response = await fetch('/api/admin/auth/permissions', {
-        // Cache for 5 minutes in browser
-        headers: {
-          'Cache-Control': 'max-age=300',
-        },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();

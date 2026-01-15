@@ -1,11 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface UserPermissions {
-  isSuperAdmin: boolean;
-  effectivePermissions: string[];
-}
+import { useContext } from 'react';
+import { PermissionsContext, UserPermissions } from '@/contexts/permissions-context';
 
 /**
  * Helper function to check if effective permissions include a specific permission
@@ -33,115 +29,52 @@ const checkPermissionInList = (effectivePerms: string[], permission: string): bo
 
 /**
  * Hook to check if current user has a specific permission
- * Supports .manage permissions as wildcards for their category
+ * Uses PermissionsContext to avoid duplicate API calls
  */
 export function useHasPermission(permission: string): boolean {
-  const [hasPermission, setHasPermission] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const context = useContext(PermissionsContext);
+  
+  if (!context || context.loading || !context.permissions) {
+    return false;
+  }
 
-  useEffect(() => {
-    const checkPermission = async () => {
-      try {
-        const response = await fetch('/api/admin/auth/permissions');
-        if (response.ok) {
-          const data = await response.json();
-          const userPerms: UserPermissions = data.data;
-          
-          // Super admin has all permissions
-          if (userPerms.isSuperAdmin) {
-            setHasPermission(true);
-          } else {
-            // Check if user has the permission (including .manage wildcards)
-            setHasPermission(
-              checkPermissionInList(userPerms.effectivePermissions, permission)
-            );
-          }
-        }
-      } catch (error) {
-        console.error('Error checking permission:', error);
-        setHasPermission(false);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { permissions } = context;
+  
+  // Super admin has all permissions
+  if (permissions.isSuperAdmin) {
+    return true;
+  }
 
-    checkPermission();
-  }, [permission]);
-
-  return hasPermission;
+  // Check if user has the permission (including .manage wildcards)
+  return checkPermissionInList(permissions.effectivePermissions, permission);
 }
 
 /**
  * Hook to check if current user is super admin
+ * Uses PermissionsContext to avoid duplicate API calls
  */
 export function useIsSuperAdmin(): boolean {
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const context = useContext(PermissionsContext);
+  
+  if (!context || context.loading || !context.permissions) {
+    return false;
+  }
 
-  useEffect(() => {
-    const checkSuperAdmin = async () => {
-      try {
-        const response = await fetch('/api/admin/auth/permissions');
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Permissions API response:', data);
-          setIsSuperAdmin(data.data?.isSuperAdmin || false);
-        } else {
-          console.error('Permissions API error:', response.status, await response.text());
-        }
-      } catch (error) {
-        console.error('Error checking super admin status:', error);
-        setIsSuperAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkSuperAdmin();
-  }, []);
-
-  return isSuperAdmin;
+  return context.permissions.isSuperAdmin;
 }
 
 /**
  * Hook to get all user permissions
- * This now uses the PermissionsContext for shared state
+ * Uses PermissionsContext for shared state
  */
 export function usePermissions(): { permissions: UserPermissions | null; loading: boolean } {
-  // Try to use context first (if available within PermissionsProvider)
   const context = useContext(PermissionsContext);
   
-  // If context is available and has been initialized, use it
-  if (context && (context.permissions !== null || !context.loading)) {
-    return { permissions: context.permissions, loading: context.loading };
+  if (!context) {
+    // Fallback if context not available (shouldn't happen in admin layout)
+    return { permissions: null, loading: true };
   }
   
-  // Fallback to local state if context not available (shouldn't happen in admin layout)
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const response = await fetch('/api/admin/auth/permissions', {
-          cache: 'force-cache',
-          next: { revalidate: 300 },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setPermissions(data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching permissions:', error);
-        setPermissions(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPermissions();
-  }, []);
-
-  return { permissions, loading };
+  return { permissions: context.permissions, loading: context.loading };
 }
 
