@@ -282,7 +282,10 @@ export function LocationsTab() {
         loading={loading}
         pagination={pagination}
         onPageChange={(newPage) => {
-          setPage(newPage);
+          if (newPage !== page) {
+            setPage(newPage);
+            setPagination(prev => ({ ...prev, page: newPage }));
+          }
         }}
         onLimitChange={(newLimit) => {
           setLimit(newLimit);
@@ -291,7 +294,10 @@ export function LocationsTab() {
         searchable
         onSearch={(search) => {
           setSearchTerm(search);
-          setPage(1); // Reset to first page when searching
+          // Only reset to page 1 if search term actually changed (not empty to empty)
+          if (search !== searchTerm && (search || searchTerm)) {
+            setPage(1);
+          }
         }}
         actions={actions}
       />

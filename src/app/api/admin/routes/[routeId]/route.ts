@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { routeId: string } }
+  { params }: { params: Promise<{ routeId: string }> | { routeId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,9 +13,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const routeId = resolvedParams.routeId;
+
+    if (!routeId) {
+      return NextResponse.json({ error: 'Route ID is required' }, { status: 400 });
+    }
+
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE_URL}routes/${params.routeId}`, {
+    const response = await fetch(`${API_BASE_URL}routes/${routeId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -39,7 +47,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { routeId: string } }
+  { params }: { params: Promise<{ routeId: string }> | { routeId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -48,7 +56,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE_URL}routes/${params.routeId}`, {
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const routeId = resolvedParams.routeId;
+
+    if (!routeId) {
+      return NextResponse.json({ error: 'Route ID is required' }, { status: 400 });
+    }
+
+    const response = await fetch(`${API_BASE_URL}routes/${routeId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,

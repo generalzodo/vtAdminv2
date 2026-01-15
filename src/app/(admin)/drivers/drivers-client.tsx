@@ -230,7 +230,7 @@ export function DriversClient() {
       });
 
       handleCloseDialog();
-      fetchDrivers();
+      fetchDrivers(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -266,7 +266,7 @@ export function DriversClient() {
 
       setDeleteDialogOpen(false);
       setDeletingDriverId(null);
-      fetchDrivers();
+      fetchDrivers(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -379,7 +379,10 @@ export function DriversClient() {
             searchable={true}
             onSearch={(search) => {
               setSearchTerm(search);
-              setPage(1); // Reset to first page when searching
+              // Only reset to page 1 if search term actually changed (not empty to empty)
+              if (search !== searchTerm && (search || searchTerm)) {
+                setPage(1);
+              }
             }}
             actions={actions}
           />

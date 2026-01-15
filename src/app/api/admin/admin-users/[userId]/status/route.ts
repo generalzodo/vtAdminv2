@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -16,9 +16,20 @@ export async function PATCH(
       );
     }
 
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const userId = resolvedParams.userId;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: true, message: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE_URL}/admin/admin-users/${params.userId}/status`, {
+    const response = await fetch(`${API_BASE_URL}/admin/admin-users/${userId}/status`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -236,16 +236,27 @@ export function TripsClient() {
   const handleOpenDialog = (trip?: Trip) => {
     if (trip) {
       setEditingTrip(trip);
+      
+      // Helper to safely get a value, ensuring it's never the string "undefined"
+      const safeValue = (value: any, fallback: string = '') => {
+        if (value === 'undefined' || value === undefined || value === null) return fallback;
+        const str = String(value).trim();
+        return str === 'undefined' ? fallback : str;
+      };
+      
+      const routeValue = typeof trip.route === 'string' ? trip.route : trip.route?._id;
+      const driverValue = typeof trip.driver === 'string' ? trip.driver : trip.driver?._id;
+      
       setFormData({
-        route: typeof trip.route === 'string' ? trip.route : trip.route?._id || '',
-        title: trip.title || '',
-        driver: typeof trip.driver === 'string' ? trip.driver : trip.driver?._id || '',
+        route: safeValue(routeValue),
+        title: safeValue(trip.title),
+        driver: safeValue(driverValue),
         tripDate: trip.tripDate ? new Date(trip.tripDate) : undefined,
         isWalkIn: trip.isWalkIn || false,
-        time: trip.time || '',
-        walkInTimeSlot: trip.walkInTimeSlot || '',
-        capacity: (trip as any).capacity?.toString() || '',
-        busNo: trip.busNo || '',
+        time: safeValue(trip.time),
+        walkInTimeSlot: safeValue(trip.walkInTimeSlot),
+        capacity: safeValue((trip as any).capacity?.toString()),
+        busNo: safeValue(trip.busNo),
       });
     } else {
       setEditingTrip(null);
@@ -311,22 +322,51 @@ export function TripsClient() {
 
     setSubmitting(true);
     try {
-      const payload: any = {
-        route: formData.route,
-        title: formData.title,
-        driver: formData.driver || undefined,
-        tripDate: formData.tripDate?.toISOString().split('T')[0],
-        isWalkIn: formData.isWalkIn,
-        time: formData.isWalkIn ? undefined : formData.time,
-        walkInTimeSlot: formData.isWalkIn ? formData.walkInTimeSlot : undefined,
-        capacity: formData.isWalkIn && formData.capacity ? parseInt(formData.capacity) : undefined,
-        busNo: formData.busNo,
+      // Build payload, explicitly excluding _id and undefined values
+      const payload: any = {};
+      
+      // Helper function to safely add a value (excludes undefined, null strings, and "undefined" string)
+      const addIfValid = (key: string, value: any) => {
+        if (value !== undefined && value !== null && value !== '' && value !== 'undefined' && String(value).trim() !== 'undefined') {
+          payload[key] = value;
+        }
       };
+      
+      addIfValid('route', formData.route);
+      addIfValid('title', formData.title);
+      addIfValid('driver', formData.driver);
+      if (formData.tripDate) payload.tripDate = formData.tripDate.toISOString().split('T')[0];
+      payload.isWalkIn = formData.isWalkIn;
+      
+      if (formData.isWalkIn) {
+        // For walk-in buses, time should be null, not undefined
+        payload.time = null;
+        addIfValid('walkInTimeSlot', formData.walkInTimeSlot);
+        if (formData.capacity) payload.capacity = parseInt(formData.capacity);
+      } else {
+        // For regular buses, time is required
+        addIfValid('time', formData.time);
+      }
+      
+      addIfValid('busNo', formData.busNo);
+
+      // Explicitly remove _id if it somehow got in there
+      delete payload._id;
+      
+      // Final safety check: remove any fields that are the string "undefined"
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === 'undefined' || String(payload[key]).trim() === 'undefined') {
+          delete payload[key];
+        }
+      });
 
       const url = editingTrip 
         ? `/api/admin/trips/${editingTrip._id}`
         : '/api/admin/trips';
       const method = editingTrip ? 'PATCH' : 'POST';
+
+      // Debug log to see what we're sending
+      console.log('Sending trip payload:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(url, {
         method,
@@ -346,7 +386,7 @@ export function TripsClient() {
       });
 
       handleCloseDialog();
-      fetchTrips();
+      fetchTrips(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -382,7 +422,7 @@ export function TripsClient() {
 
       setDeleteDialogOpen(false);
       setDeletingTripId(null);
-      fetchTrips();
+      fetchTrips(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -411,7 +451,7 @@ export function TripsClient() {
         description: `Trip marked as ${status} successfully`,
       });
 
-      fetchTrips();
+      fetchTrips(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -450,7 +490,7 @@ export function TripsClient() {
       });
 
       setSelectedRecordIds([]);
-      fetchTrips();
+      fetchTrips(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',

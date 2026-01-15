@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,9 +13,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const id = resolvedParams.id;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Location ID is required' }, { status: 400 });
+    }
+
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE_URL}locations/${params.id}`, {
+    const response = await fetch(`${API_BASE_URL}locations/${id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -54,7 +62,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -63,7 +71,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE_URL}locations/${params.id}`, {
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const id = resolvedParams.id;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Location ID is required' }, { status: 400 });
+    }
+
+    const response = await fetch(`${API_BASE_URL}locations/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,

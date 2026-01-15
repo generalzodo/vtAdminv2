@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { agentId: string } }
+  { params }: { params: Promise<{ agentId: string }> | { agentId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,8 +13,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const agentId = resolvedParams.agentId;
+
+    if (!agentId) {
+      return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 });
+    }
+
     const body = await request.json();
-    const { agentId } = params;
 
     const response = await fetch(`${API_BASE_URL}users/agents/${agentId}/status`, {
       method: 'PATCH',

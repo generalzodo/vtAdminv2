@@ -762,7 +762,7 @@ export function RoutesClient() {
 
       setDeleteDialogOpen(false);
       setDeletingRouteId(null);
-      fetchRoutes();
+      fetchRoutes(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -992,7 +992,10 @@ export function RoutesClient() {
             searchable={true}
             onSearch={(search) => {
               setSearchTerm(search);
-              setPage(1); // Reset to first page when searching
+              // Only reset to page 1 if search term actually changed (not empty to empty)
+              if (search !== searchTerm && (search || searchTerm)) {
+                setPage(1);
+              }
             }}
             actions={actions}
           />

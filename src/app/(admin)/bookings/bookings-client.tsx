@@ -321,6 +321,11 @@ export function BookingsClient() {
     if (paymentStatusFilter !== 'all') params.append('paymentStatus', paymentStatusFilter);
     if (userTypeFilter !== 'all') params.append('userType', userTypeFilter);
     
+    // Add search parameter
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    
     const exportUrl = `/api/admin/export/bookings?${params.toString()}`;
     window.open(exportUrl, '_blank');
   };

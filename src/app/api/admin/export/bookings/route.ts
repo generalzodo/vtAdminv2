@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const paymentStatus = searchParams.get('paymentStatus');
     const userType = searchParams.get('userType');
+    const search = searchParams.get('search');
     
     // Get date range - prioritize custom dates, then use filter dates
     let from = searchParams.get('from');
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
     if (status && status !== 'all') params.append('status', status);
     if (paymentStatus && paymentStatus !== 'all') params.append('paymentStatus', paymentStatus);
     if (userType && userType !== 'all') params.append('userType', userType);
+    if (search) params.append('search', search);
 
     // Determine endpoint based on tab
     let endpoint = `${API_BASE_URL}booking`;
@@ -97,35 +99,86 @@ export async function GET(request: NextRequest) {
 
     const bookings = allBookings;
 
-    // Transform data for Excel
-    const excelData = bookings.map((booking: any) => ({
-      'Booking ID': booking.bookingId || '',
-      'First Name': booking.firstName || '',
-      'Last Name': booking.lastName || '',
-      'Email': booking.email || '',
-      'Phone': booking.phone || '',
-      'User Type': booking.user?.type || 'user',
-      'From': booking.from || '',
-      'To': booking.to || '',
-      'Trip Route': booking.trip?.title || `${booking.from}-${booking.to}`,
-      'Travel Date': booking.trip?.tripDate || '',
-      'Travel Time': booking.trip?.time || '',
-      'Bus Type': booking.trip?.bus || '',
-      'Seat No': booking.tripSeat || '',
-      'Return Seat': booking.returnSeat || '',
-      'Trip Amount': booking.tripAmount || 0,
-      'Return Amount': booking.returnAmount || 0,
-      'Total Amount': (booking.tripAmount || 0) + (booking.returnAmount || 0),
-      'Discounted Fare': booking.discountedFare || 0,
-      'Status': booking.status || '',
-      'Payment Status': booking.paymentStatus || '',
-      'Payment Mode': booking.mode || 'Paystack',
-      'Payment Ref': booking.paystack_ref || booking.paystack_reference || booking.flutterwave_ref || '',
-      'Rescheduled': booking.isRescheduled ? 'Yes' : 'No',
-      'On Boarded': booking.onBoarded ? 'Yes' : 'No',
-      'Booking Date': booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '',
-      'Created At': booking.createdAt ? new Date(booking.createdAt).toISOString() : '',
-    }));
+    // Define column order - first 15 fields as specified, then the rest
+    const primaryColumnOrder = [
+      'id',
+      'Trip seats',
+      'First Name',
+      'Second name',
+      'Last name',
+      'Phone',
+      'Emergency Phone',
+      'From',
+      'TO',
+      'Trip Amount',
+      'Payment Status',
+      'Trip Tittle',
+      'Trip Time',
+      'Trip Date',
+      'Status',
+    ];
+
+    // Transform data for Excel with all fields
+    const allData = bookings.map((booking: any) => {
+      // Combine trip seats (tripSeat and returnSeat if both exist)
+      const tripSeats = booking.tripSeat 
+        ? (booking.returnSeat ? `${booking.tripSeat} | ${booking.returnSeat}` : booking.tripSeat)
+        : (booking.returnSeat || '');
+
+      return {
+        'id': booking.bookingId || booking._id || '',
+        'Trip seats': tripSeats,
+        'First Name': booking.firstName || '',
+        'Second name': booking.middleName || '',
+        'Last name': booking.lastName || '',
+        'Phone': booking.phone || '',
+        'Emergency Phone': booking.emergencyPhone || '',
+        'From': booking.from || '',
+        'TO': booking.to || '',
+        'Trip Amount': booking.tripAmount || 0,
+        'Payment Status': booking.paymentStatus || '',
+        'Trip Tittle': booking.trip?.title || '',
+        'Trip Time': booking.trip?.time || '',
+        'Trip Date': booking.trip?.tripDate || '',
+        'Status': booking.status || '',
+        // Remaining columns in any order
+        'Email': booking.email || '',
+        'User Type': booking.user?.type || 'user',
+        'Trip Route': booking.trip?.title || `${booking.from}-${booking.to}`,
+        'Bus Type': booking.trip?.bus || '',
+        'Return Amount': booking.returnAmount || 0,
+        'Total Amount': (booking.tripAmount || 0) + (booking.returnAmount || 0),
+        'Discounted Fare': booking.discountedFare || 0,
+        'Payment Mode': booking.mode || 'Paystack',
+        'Payment Ref': booking.paystack_ref || booking.paystack_reference || booking.flutterwave_ref || '',
+        'Rescheduled': booking.isRescheduled ? 'Yes' : 'No',
+        'On Boarded': booking.onBoarded ? 'Yes' : 'No',
+        'Emergency First Name': booking.emergencyFirstName || '',
+        'Emergency Last Name': booking.emergencyLastName || '',
+        'Emergency Email': booking.emergencyEmail || '',
+        'Booking Date': booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : '',
+        'Created At': booking.createdAt ? new Date(booking.createdAt).toISOString() : '',
+      };
+    });
+
+    // Reorder columns according to specified order
+    const excelData = allData.map((row: any) => {
+      const orderedRow: any = {};
+      
+      // Add primary columns in specified order
+      for (const col of primaryColumnOrder) {
+        orderedRow[col] = row[col];
+      }
+      
+      // Add remaining columns in any order
+      for (const key in row) {
+        if (!primaryColumnOrder.includes(key)) {
+          orderedRow[key] = row[key];
+        }
+      }
+      
+      return orderedRow;
+    });
 
     // Create workbook and worksheet
     const wb = XLSX.utils.book_new();

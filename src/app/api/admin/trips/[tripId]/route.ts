@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> | { tripId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,9 +13,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const tripId = resolvedParams.tripId;
+
+    if (!tripId) {
+      return NextResponse.json({ error: 'Trip ID is required' }, { status: 400 });
+    }
+
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE_URL}trips/${params.tripId}`, {
+    const response = await fetch(`${API_BASE_URL}trips/${tripId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -39,7 +47,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> | { tripId: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -48,7 +56,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE_URL}trips/${params.tripId}`, {
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const tripId = resolvedParams.tripId;
+
+    if (!tripId) {
+      return NextResponse.json({ error: 'Trip ID is required' }, { status: 400 });
+    }
+
+    const response = await fetch(`${API_BASE_URL}trips/${tripId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
