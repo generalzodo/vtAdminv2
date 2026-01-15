@@ -309,7 +309,8 @@ export function TripsClient() {
     if (!formData.title) errors.title = 'Please enter title';
     if (!formData.tripDate) errors.tripDate = 'Please select trip date';
     if (!formData.isWalkIn && !formData.time) errors.time = 'Please enter departure time';
-    if (!formData.busNo) errors.busNo = 'Please enter bus number';
+    // Only validate busNo when creating a new trip, not when editing
+    if (!editingTrip && !formData.busNo) errors.busNo = 'Please enter bus number';
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -1150,7 +1151,7 @@ export function TripsClient() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="busNo">Bus No. *</Label>
+              <Label htmlFor="busNo">Bus No. {!editingTrip && '*'}</Label>
               <Input
                 id="busNo"
                 value={formData.busNo}

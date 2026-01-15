@@ -99,7 +99,7 @@ export function DataTable<T extends Record<string, any>>({
     if (searchable && onSearch) {
       const timeoutId = setTimeout(() => {
         onSearch(searchTerm);
-      }, 800); // Increased debounce from 300ms to 800ms to reduce API calls
+      }, 1800); // Increased debounce from 300ms to 800ms to reduce API calls
       return () => clearTimeout(timeoutId);
     }
   }, [searchTerm, onSearch, searchable]);
