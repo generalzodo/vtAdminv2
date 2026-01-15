@@ -101,17 +101,12 @@ export function AdminUsersClient() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-    fetchRoles();
-  }, [page, limit, roleFilter, statusFilter, searchTerm]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
@@ -121,17 +116,14 @@ export function AdminUsersClient() {
       const data = await response.json();
       if (data.success) {
         setUsers(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       } else {
         toast({
@@ -163,6 +155,11 @@ export function AdminUsersClient() {
       console.error('Error fetching roles:', error);
     }
   };
+
+  useEffect(() => {
+    fetchUsers(page, limit);
+    fetchRoles();
+  }, [page, limit, roleFilter, statusFilter, searchTerm]);
 
   const handleOpenDialog = (user?: AdminUser) => {
     if (user) {
@@ -279,7 +276,7 @@ export function AdminUsersClient() {
           description: editingUser ? 'Admin user updated successfully' : 'Admin user created successfully',
         });
         handleCloseDialog();
-        fetchUsers();
+        fetchUsers(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -319,7 +316,7 @@ export function AdminUsersClient() {
           title: 'Success',
           description: 'Admin user deleted successfully',
         });
-        fetchUsers();
+        fetchUsers(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -466,7 +463,7 @@ export function AdminUsersClient() {
           title: 'Success',
           description: 'User status updated successfully',
         });
-        fetchUsers();
+        fetchUsers(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -629,7 +626,10 @@ export function AdminUsersClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);

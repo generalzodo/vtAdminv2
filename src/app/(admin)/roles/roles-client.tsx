@@ -78,17 +78,12 @@ export function RolesClient() {
   const { toast } = useToast();
   const isSuperAdmin = useIsSuperAdmin();
 
-  useEffect(() => {
-    fetchRoles();
-    fetchPermissions();
-  }, [page, limit, searchTerm]);
-
-  const fetchRoles = async () => {
+  const fetchRoles = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (searchTerm) params.append('search', searchTerm);
 
@@ -96,17 +91,14 @@ export function RolesClient() {
       const data = await response.json();
       if (data.success) {
         setRoles(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       } else {
         toast({
@@ -139,6 +131,11 @@ export function RolesClient() {
       console.error('Error fetching permissions:', error);
     }
   };
+
+  useEffect(() => {
+    fetchRoles(page, limit);
+    fetchPermissions();
+  }, [page, limit, searchTerm]);
 
   const handleOpenDialog = (role?: Role) => {
     if (role) {
@@ -277,7 +274,7 @@ export function RolesClient() {
           description: editingRole ? 'Role updated successfully' : 'Role created successfully',
         });
         handleCloseDialog();
-        fetchRoles();
+        fetchRoles(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -317,7 +314,7 @@ export function RolesClient() {
           title: 'Success',
           description: 'Role deleted successfully',
         });
-        fetchRoles();
+        fetchRoles(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -425,7 +422,10 @@ export function RolesClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);

@@ -46,16 +46,12 @@ export function WithdrawalsClient() {
   const [toDateFilter, setToDateFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  useEffect(() => {
-    fetchWithdrawals();
-  }, [page, limit, statusFilter, fromDateFilter, toDateFilter, searchTerm]);
-
-  const fetchWithdrawals = async () => {
+  const fetchWithdrawals = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (fromDateFilter) params.append('from', fromDateFilter);
@@ -66,17 +62,14 @@ export function WithdrawalsClient() {
       const data = await response.json();
       if (data.success) {
         setWithdrawals(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -85,6 +78,10 @@ export function WithdrawalsClient() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchWithdrawals(page, limit);
+  }, [page, limit, statusFilter, fromDateFilter, toDateFilter, searchTerm]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -229,7 +226,12 @@ export function WithdrawalsClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              // Only update if the page actually changed
+              if (newPage !== page) {
+                setPage(newPage);
+                // Immediately update pagination to prevent flicker
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);
@@ -238,7 +240,10 @@ export function WithdrawalsClient() {
             searchable={true}
             onSearch={(search) => {
               setSearchTerm(search);
-              setPage(1); // Reset to first page when searching
+              // Only reset to page 1 if search term actually changed (not empty to empty)
+              if (search !== searchTerm && (search || searchTerm)) {
+                setPage(1);
+              }
             }}
             actions={actions}
           />

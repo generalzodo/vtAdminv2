@@ -462,7 +462,7 @@ export function RoutesClient() {
   }, [originFilter, destinationFilter, searchTerm]);
 
   useEffect(() => {
-    fetchRoutes();
+    fetchRoutes(page, limit);
   }, [page, limit, originFilter, destinationFilter, searchTerm]);
 
   useEffect(() => {
@@ -504,12 +504,12 @@ export function RoutesClient() {
     }
   }, [selectedRecordIds, routes]);
 
-  const fetchRoutes = async () => {
+  const fetchRoutes = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (originFilter !== 'all') params.append('origin', originFilter);
       if (destinationFilter !== 'all') params.append('destination', destinationFilter);
@@ -519,17 +519,14 @@ export function RoutesClient() {
       const data = await response.json();
       if (data.success) {
         setRoutes(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -724,7 +721,7 @@ export function RoutesClient() {
       });
 
       handleCloseDialog();
-      fetchRoutes();
+      fetchRoutes(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -809,7 +806,7 @@ export function RoutesClient() {
       }
 
       setSelectedRecordIds([]);
-      fetchRoutes();
+      fetchRoutes(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -983,7 +980,10 @@ export function RoutesClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);

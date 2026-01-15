@@ -73,16 +73,12 @@ export function DriversClient() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchDrivers();
-  }, [page, limit, statusFilter, stateFilter, searchTerm]);
-
-  const fetchDrivers = async () => {
+  const fetchDrivers = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (stateFilter !== 'all') params.append('state', stateFilter);
@@ -92,17 +88,14 @@ export function DriversClient() {
       const data = await response.json();
       if (data.success) {
         setDrivers(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -111,6 +104,10 @@ export function DriversClient() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDrivers(page, limit);
+  }, [page, limit, statusFilter, stateFilter, searchTerm]);
 
   const getStatusBadge = (status: string) => {
     const variant = status === 'active' || status === 'available' 
@@ -370,7 +367,10 @@ export function DriversClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);

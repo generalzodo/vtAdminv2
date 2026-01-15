@@ -127,7 +127,7 @@ export function TripsClient() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchTrips();
+    fetchTrips(page, limit);
     fetchRoutes();
     fetchDrivers();
   }, [page, limit, statusFilter, routeFilter, fromDateFilter, toDateFilter, searchTerm]);
@@ -165,12 +165,12 @@ export function TripsClient() {
     }
   }, [selectedRecordIds, trips]);
 
-  const fetchTrips = async () => {
+  const fetchTrips = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (routeFilter !== 'all') params.append('route', routeFilter);
@@ -194,17 +194,14 @@ export function TripsClient() {
       const data = await response.json();
       if (data.success) {
         setTrips(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       } else {
         throw new Error(data.error || 'Failed to fetch trips');
@@ -951,7 +948,12 @@ export function TripsClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              // Only update if the page actually changed
+              if (newPage !== page) {
+                setPage(newPage);
+                // Immediately update pagination to prevent flicker
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);
@@ -960,7 +962,10 @@ export function TripsClient() {
             searchable={true}
             onSearch={(search) => {
               setSearchTerm(search);
-              setPage(1); // Reset to first page when searching
+              // Only reset to page 1 if search term actually changed (not empty to empty)
+              if (search !== searchTerm && (search || searchTerm)) {
+                setPage(1);
+              }
             }}
             actions={actions}
           />

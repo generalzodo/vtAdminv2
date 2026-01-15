@@ -86,7 +86,7 @@ export function AgentsClient() {
     if (activeTab === 'pending') {
       fetchPendingAgents();
     } else {
-      fetchAgents();
+      fetchAgents(page, limit);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, activeTab, searchTerm]);
@@ -118,10 +118,10 @@ export function AgentsClient() {
     }
   };
 
-  const fetchAgents = async () => {
+  const fetchAgents = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
-      let url = `/api/admin/agents?page=${page}&limit=${limit}`;
+      let url = `/api/admin/agents?page=${currentPage}&limit=${currentLimit}`;
       
       // Add status filter based on active tab
       if (activeTab === 'active') {
@@ -137,17 +137,14 @@ export function AgentsClient() {
       const data = await response.json();
       if (data.success) {
         setAgents(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -228,7 +225,7 @@ export function AgentsClient() {
         setSelectedAgent(null);
         fetchPendingAgents();
         if (activeTab !== 'pending') {
-          fetchAgents();
+          fetchAgents(page, limit);
         }
       } else {
         throw new Error(data.error || 'Failed to approve agent');
@@ -281,7 +278,7 @@ export function AgentsClient() {
         setRejectionReason('');
         fetchPendingAgents();
         if (activeTab !== 'pending') {
-          fetchAgents();
+          fetchAgents(page, limit);
         }
       } else {
         throw new Error(data.error || 'Failed to reject agent');
@@ -355,7 +352,7 @@ export function AgentsClient() {
       if (activeTab === 'pending') {
         fetchPendingAgents();
       } else {
-        fetchAgents();
+        fetchAgents(page, limit);
       }
     } catch (error: any) {
       toast({
@@ -575,7 +572,10 @@ export function AgentsClient() {
                 loading={loading}
                 pagination={pagination}
                 onPageChange={(newPage) => {
-                  setPage(newPage);
+                  if (newPage !== page) {
+                    setPage(newPage);
+                    setPagination(prev => ({ ...prev, page: newPage }));
+                  }
                 }}
                 onLimitChange={(newLimit) => {
                   setLimit(newLimit);
@@ -596,7 +596,10 @@ export function AgentsClient() {
                 loading={loading}
                 pagination={pagination}
                 onPageChange={(newPage) => {
-                  setPage(newPage);
+                  if (newPage !== page) {
+                    setPage(newPage);
+                    setPagination(prev => ({ ...prev, page: newPage }));
+                  }
                 }}
                 onLimitChange={(newLimit) => {
                   setLimit(newLimit);

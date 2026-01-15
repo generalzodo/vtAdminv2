@@ -48,16 +48,12 @@ export function ReviewsClient() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  useEffect(() => {
-    fetchReviews();
-  }, [page, limit, statusFilter, ratingFilter, fromDate, toDate, searchTerm]);
-
-  const fetchReviews = async () => {
+  const fetchReviews = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (ratingFilter !== 'all') params.append('rating', ratingFilter);
@@ -69,17 +65,14 @@ export function ReviewsClient() {
       const data = await response.json();
       if (data.success) {
         setReviews(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -88,6 +81,10 @@ export function ReviewsClient() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchReviews(page, limit);
+  }, [page, limit, statusFilter, ratingFilter, fromDate, toDate, searchTerm]);
 
   const updateReviewStatus = async (reviewId: string, status: string) => {
     setProcessingId(reviewId);
@@ -276,7 +273,10 @@ export function ReviewsClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);

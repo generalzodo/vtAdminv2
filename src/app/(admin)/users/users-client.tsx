@@ -101,16 +101,12 @@ export function UsersClient() {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page, limit, statusFilter, typeFilter, stateFilter, searchTerm]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
+        page: currentPage.toString(),
+        limit: currentLimit.toString(),
       });
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (typeFilter !== 'all') params.append('type', typeFilter);
@@ -121,17 +117,14 @@ export function UsersClient() {
       const data = await response.json();
       if (data.success) {
         setUsers(data.data || []);
-        // Ensure pagination always reflects the current page state, not stale state
-        const paginationData = data.pagination || {
-          page: page,
-          limit: limit,
-          total: data.data?.length || 0,
-          pages: Math.ceil((data.data?.length || 0) / limit),
-        };
-        // Always use the current page from state, not from response (which might be stale)
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
         setPagination({
-          ...paginationData,
-          page: page, // Force current page state
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
         });
       }
     } catch (error) {
@@ -140,6 +133,10 @@ export function UsersClient() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUsers(page, limit);
+  }, [page, limit, statusFilter, typeFilter, stateFilter, searchTerm]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -460,7 +457,10 @@ export function UsersClient() {
             loading={loading}
             pagination={pagination}
             onPageChange={(newPage) => {
-              setPage(newPage);
+              if (newPage !== page) {
+                setPage(newPage);
+                setPagination(prev => ({ ...prev, page: newPage }));
+              }
             }}
             onLimitChange={(newLimit) => {
               setLimit(newLimit);
