@@ -116,7 +116,7 @@ export function BookingsClient() {
   }, [activeTab, selectedFilter, statusFilter, paymentStatusFilter, userTypeFilter, customStartDate, customEndDate, searchTerm]);
 
   useEffect(() => {
-    fetchBookings();
+    fetchBookings(page, limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, activeTab, selectedFilter, statusFilter, paymentStatusFilter, userTypeFilter, customStartDate, customEndDate, searchTerm]);
 
@@ -149,7 +149,7 @@ export function BookingsClient() {
     };
   };
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
     try {
       let endpoint = '/api/admin/bookings';
@@ -161,8 +161,8 @@ export function BookingsClient() {
 
       // Build query params with date filter
       const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
+      params.append('page', currentPage.toString());
+      params.append('limit', currentLimit.toString());
       
       // Add date filter if selected
       if (selectedFilter.value === 'custom') {
@@ -234,8 +234,8 @@ export function BookingsClient() {
         
         setBookings([]);
         setPagination({
-          page: 1,
-          limit: 20,
+          page: currentPage,
+          limit: currentLimit,
           total: 0,
           pages: 1,
         });
@@ -245,27 +245,21 @@ export function BookingsClient() {
       const data = await response.json();
       if (data.success) {
         setBookings(data.data || []);
-        if (data.pagination) {
-          setPagination({
-            page: data.pagination.page || parseInt(String(page)),
-            limit: data.pagination.limit || parseInt(String(limit)),
-            total: data.pagination.total || 0,
-            pages: data.pagination.pages || 1,
-          });
-        } else {
-          setPagination({
-            page: parseInt(String(page)),
-            limit: parseInt(String(limit)),
-          total: data.data?.length || 0,
-            pages: Math.ceil((data.data?.length || 0) / parseInt(String(limit))),
-          });
-        }
+        // Always use the current page from parameter, ignore API response page value
+        const total = data.pagination?.total || data.data?.length || 0;
+        const pages = data.pagination?.pages || Math.ceil(total / currentLimit);
+        setPagination({
+          page: currentPage, // Always use the requested page, never from API
+          limit: currentLimit,
+          total: total,
+          pages: pages,
+        });
       } else {
         console.error('API returned unsuccessful response:', data);
         setBookings([]);
         setPagination({
-          page: 1,
-          limit: parseInt(String(limit)),
+          page: currentPage,
+          limit: currentLimit,
           total: 0,
           pages: 1,
         });
@@ -289,8 +283,8 @@ export function BookingsClient() {
       
       setBookings([]);
       setPagination({
-        page: 1,
-        limit: 20,
+        page: currentPage,
+        limit: currentLimit,
         total: 0,
         pages: 1,
       });
@@ -354,7 +348,7 @@ export function BookingsClient() {
         setBulkStatusDialogOpen(false);
         setBulkStatusValue('');
         setSelectedBookings([]);
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to update status');
       }
@@ -392,7 +386,7 @@ export function BookingsClient() {
         setBulkPaymentStatusDialogOpen(false);
         setBulkPaymentStatusValue('');
         setSelectedBookings([]);
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to update payment status');
       }
@@ -645,7 +639,7 @@ export function BookingsClient() {
         });
         setVerifyPaymentDialogOpen(false);
         setVerifyingBooking(null);
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to confirm payment');
       }
@@ -674,7 +668,7 @@ export function BookingsClient() {
           title: 'Success',
           description: 'Booking marked as used',
         });
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to update booking');
       }
@@ -701,7 +695,7 @@ export function BookingsClient() {
           title: 'Success',
           description: 'Booking marked as unused',
         });
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to update booking');
       }
@@ -757,7 +751,7 @@ export function BookingsClient() {
 
       const data = await response.json();
       if (response.ok && data.success) {
-        fetchBookings();
+        fetchBookings(page, limit);
       } else {
         throw new Error(data.error || 'Failed to update onboarded status');
       }
@@ -961,12 +955,20 @@ export function BookingsClient() {
                 data={bookings}
                 loading={loading}
                 pagination={pagination}
-                onPageChange={setPage}
+                onPageChange={(newPage) => {
+                  if (newPage !== page) {
+                    setPage(newPage);
+                    setPagination(prev => ({ ...prev, page: newPage }));
+                  }
+                }}
                 onLimitChange={setLimit}
                 searchable={true}
                 onSearch={(search) => {
                   setSearchTerm(search);
-                  setPage(1); // Reset to first page when searching
+                  // Only reset to page 1 if search term actually changed (not empty to empty)
+                  if (search !== searchTerm && (search || searchTerm)) {
+                    setPage(1);
+                  }
                 }}
                 actions={actions}
                 selectable
@@ -1094,12 +1096,20 @@ export function BookingsClient() {
                 data={bookings}
                 loading={loading}
                 pagination={pagination}
-                onPageChange={setPage}
+                onPageChange={(newPage) => {
+                  if (newPage !== page) {
+                    setPage(newPage);
+                    setPagination(prev => ({ ...prev, page: newPage }));
+                  }
+                }}
                 onLimitChange={setLimit}
                 searchable={true}
                 onSearch={(search) => {
                   setSearchTerm(search);
-                  setPage(1); // Reset to first page when searching
+                  // Only reset to page 1 if search term actually changed (not empty to empty)
+                  if (search !== searchTerm && (search || searchTerm)) {
+                    setPage(1);
+                  }
                 }}
                 actions={actions}
                 selectable
@@ -1227,12 +1237,20 @@ export function BookingsClient() {
                 data={bookings}
                 loading={loading}
                 pagination={pagination}
-                onPageChange={setPage}
+                onPageChange={(newPage) => {
+                  if (newPage !== page) {
+                    setPage(newPage);
+                    setPagination(prev => ({ ...prev, page: newPage }));
+                  }
+                }}
                 onLimitChange={setLimit}
                 searchable={true}
                 onSearch={(search) => {
                   setSearchTerm(search);
-                  setPage(1); // Reset to first page when searching
+                  // Only reset to page 1 if search term actually changed (not empty to empty)
+                  if (search !== searchTerm && (search || searchTerm)) {
+                    setPage(1);
+                  }
                 }}
                 actions={actions}
                 selectable
