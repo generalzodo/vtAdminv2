@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface Column<T> {
@@ -101,6 +101,13 @@ export function DataTable<T extends Record<string, any>>({
     }
   };
 
+  const handleReset = () => {
+    setSearchTerm('');
+    if (searchable && onSearch) {
+      onSearch('');
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearch();
@@ -146,6 +153,29 @@ export function DataTable<T extends Record<string, any>>({
             {bulkActions}
           </div>
         )}
+        
+        {searchable && (
+          <div className="flex items-center gap-2 p-2">
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="max-w-sm"
+            />
+            <Button onClick={handleSearch} size="default" variant="default">
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
+            {searchTerm && (
+              <Button onClick={handleReset} size="default" variant="outline">
+                <X className="h-4 w-4 mr-2" />
+                Reset
+              </Button>
+            )}
+          </div>
+        )}
+        
         <div className="rounded-md border overflow-hidden w-full relative">
           <div 
             className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
@@ -209,6 +239,12 @@ export function DataTable<T extends Record<string, any>>({
             <Search className="h-4 w-4 mr-2" />
             Search
           </Button>
+          {searchTerm && (
+            <Button onClick={handleReset} size="default" variant="outline">
+              <X className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+          )}
         </div>
       )}
 
