@@ -244,6 +244,30 @@ export function TripsClient() {
         return str === 'undefined' ? fallback : str;
       };
       
+      // Parse tripDate from DD-MM-YYYY format to Date object
+      const parseTripDate = (dateString: string | undefined): Date | undefined => {
+        if (!dateString) return undefined;
+        
+        // Check if it's DD-MM-YYYY format (e.g., "16-01-2026")
+        const ddmmyyyyMatch = dateString.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (ddmmyyyyMatch) {
+          const [, day, month, year] = ddmmyyyyMatch;
+          // Create date in local timezone (month is 0-indexed in JS Date)
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+        
+        // Check if it's YYYY-MM-DD format (e.g., "2026-01-16") - for backward compatibility
+        const yyyymmddMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (yyyymmddMatch) {
+          const [, year, month, day] = yyyymmddMatch;
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+        
+        // Fallback to standard Date parsing
+        const parsed = new Date(dateString);
+        return isNaN(parsed.getTime()) ? undefined : parsed;
+      };
+      
       const routeValue = typeof trip.route === 'string' ? trip.route : trip.route?._id;
       const driverValue = typeof trip.driver === 'string' ? trip.driver : trip.driver?._id;
       
@@ -251,7 +275,7 @@ export function TripsClient() {
         route: safeValue(routeValue),
         title: safeValue(trip.title),
         driver: safeValue(driverValue),
-        tripDate: trip.tripDate ? new Date(trip.tripDate) : undefined,
+        tripDate: parseTripDate(trip.tripDate),
         isWalkIn: trip.isWalkIn || false,
         time: safeValue(trip.time),
         walkInTimeSlot: safeValue(trip.walkInTimeSlot),
@@ -336,7 +360,13 @@ export function TripsClient() {
       addIfValid('route', formData.route);
       addIfValid('title', formData.title);
       addIfValid('driver', formData.driver);
-      if (formData.tripDate) payload.tripDate = formData.tripDate.toISOString().split('T')[0];
+      if (formData.tripDate) {
+        // Format date as DD-MM-YYYY to match auto-generated trips format
+        const day = String(formData.tripDate.getDate()).padStart(2, '0');
+        const month = String(formData.tripDate.getMonth() + 1).padStart(2, '0');
+        const year = formData.tripDate.getFullYear();
+        payload.tripDate = `${day}-${month}-${year}`;
+      }
       payload.isWalkIn = formData.isWalkIn;
       
       if (formData.isWalkIn) {
