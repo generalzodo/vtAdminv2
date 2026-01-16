@@ -715,7 +715,12 @@ export function BookingsClient() {
 
   const handleDownloadTicket = async (booking: Booking) => {
     try {
-      const response = await fetch(`/api/admin/bookings/${booking._id}/download-ticket`);
+      // Always use bookingId for download (backend expects bookingId, not _id)
+      if (!booking.bookingId) {
+        throw new Error('Booking ID not found. Cannot download ticket.');
+      }
+
+      const response = await fetch(`/api/admin/bookings/${booking.bookingId}/download-ticket`);
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Failed to download ticket' }));

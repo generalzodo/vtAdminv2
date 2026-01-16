@@ -126,10 +126,17 @@ export function TripsClient() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
 
+  // Reset to page 1 when filters change (but not when page changes)
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, routeFilter, fromDateFilter, toDateFilter, searchTerm]);
+
   useEffect(() => {
     fetchTrips(page, limit);
     fetchRoutes();
     fetchDrivers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, statusFilter, routeFilter, fromDateFilter, toDateFilter, searchTerm]);
 
   const fetchRoutes = async () => {

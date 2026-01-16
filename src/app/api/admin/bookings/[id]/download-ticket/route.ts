@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const token = await getAuthToken();
@@ -13,25 +13,69 @@ export async function GET(
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // First get the booking to get the bookingId
-    const bookingResponse = await fetch(`${API_BASE_URL}booking/${params.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    // Handle both sync and async params (Next.js 15+ uses async params)
+    const resolvedParams = await Promise.resolve(params);
+    const id = resolvedParams.id;
 
-    if (!bookingResponse.ok) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    if (!id) {
+      return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 });
     }
 
-    const bookingData = await bookingResponse.json();
-    // Handle different response formats
-    const booking = bookingData.data || bookingData;
-    const bookingId = booking.bookingId;
+    // Check if id is a MongoDB ObjectId (24 hex characters) or a bookingId (starts with 'T')
+    // MongoDB ObjectIds are 24 hex characters, bookingIds start with 'T' followed by numbers
+    const isMongoObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const isBookingId = id.startsWith('T');
+    
+    let bookingId: string;
+    
+    if (isBookingId) {
+      // If it's already a bookingId, use it directly
+      bookingId = id;
+    } else if (isMongoObjectId) {
+      // If it's a MongoDB ObjectId (_id), we need to fetch the booking first
+      // Since the backend /booking/:id endpoint searches by bookingId, not _id,
+      // we need to fetch from the bookings list and find the one with matching _id
+      // OR we can try to use the admin API endpoint that might handle _id
+      const bookingsResponse = await fetch(`${API_BASE_URL}booking`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!bookingId) {
-      return NextResponse.json({ error: 'Booking ID not found' }, { status: 400 });
+      if (!bookingsResponse.ok) {
+        return NextResponse.json({ 
+          error: 'Failed to fetch bookings',
+          details: 'Unable to retrieve booking information'
+        }, { status: bookingsResponse.status });
+      }
+
+      const bookingsData = await bookingsResponse.json();
+      const bookings = bookingsData.data || bookingsData;
+      
+      // Find the booking with matching _id
+      const booking = Array.isArray(bookings) 
+        ? bookings.find((b: any) => b._id === id || b._id?.toString() === id)
+        : null;
+
+      if (!booking) {
+        return NextResponse.json({ 
+          error: 'Booking not found',
+          details: 'No booking found with the provided ID'
+        }, { status: 404 });
+      }
+
+      bookingId = booking.bookingId;
+
+      if (!bookingId) {
+        return NextResponse.json({ 
+          error: 'Booking ID not found',
+          details: 'The booking was found but does not contain a bookingId field'
+        }, { status: 400 });
+      }
+    } else {
+      // If it's neither format, try to use it as bookingId anyway
+      bookingId = id;
     }
 
     // Download ticket using bookingId (backend expects bookingId, not _id)
