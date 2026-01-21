@@ -115,6 +115,13 @@ export function BookingsClient() {
     setPage(1);
   }, [activeTab, selectedFilter, statusFilter, paymentStatusFilter, userTypeFilter, customStartDate, customEndDate, searchTerm]);
 
+  // Clear end date if it becomes invalid when start date changes
+  useEffect(() => {
+    if (selectedFilter.value === 'custom' && customStartDate && customEndDate && customEndDate < customStartDate) {
+      setCustomEndDate(undefined);
+    }
+  }, [customStartDate, selectedFilter.value, customEndDate]);
+
   useEffect(() => {
     fetchBookings(page, limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,16 +177,34 @@ export function BookingsClient() {
         if (customStartDate && customEndDate) {
           // Format dates as ISO strings (YYYY-MM-DDTHH:mm:ss)
           // Backend expects these and will parse them correctly
-          const fromDate = `${customStartDate}T00:00:00`;
-          const toDate = `${customEndDate}T23:59:59`;
+          const formatDate = (date: Date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          const fromDate = `${formatDate(customStartDate)}T00:00:00`;
+          const toDate = `${formatDate(customEndDate)}T23:59:59`;
           params.append('from', fromDate);
           params.append('to', toDate);
         } else if (customStartDate) {
           // Only start date - set from date
-          params.append('from', `${customStartDate}T00:00:00`);
+          const formatDate = (date: Date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          params.append('from', `${formatDate(customStartDate)}T00:00:00`);
         } else if (customEndDate) {
           // Only end date - set to date
-          params.append('to', `${customEndDate}T23:59:59`);
+          const formatDate = (date: Date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          params.append('to', `${formatDate(customEndDate)}T23:59:59`);
         }
       } else if (selectedFilter.value && typeof selectedFilter.value === 'number') {
         const dateRange = getDateRange(selectedFilter.value);
@@ -293,21 +318,29 @@ export function BookingsClient() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const params = new URLSearchParams();
     params.append('tab', activeTab);
     
     // Add date range
     if (selectedFilter.value === 'custom') {
       if (customStartDate) {
-        const fromDate = new Date(customStartDate);
-        fromDate.setHours(0, 0, 0, 0);
-        params.append('from', fromDate.toISOString());
+        const formatDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        params.append('from', `${formatDate(customStartDate)}T00:00:00`);
       }
       if (customEndDate) {
-        const toDate = new Date(customEndDate);
-        toDate.setHours(23, 59, 59, 999);
-        params.append('to', toDate.toISOString());
+        const formatDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        params.append('to', `${formatDate(customEndDate)}T23:59:59`);
       }
     } else if (selectedFilter.value && typeof selectedFilter.value === 'number') {
       const dateRange = getDateRange(selectedFilter.value);
@@ -325,9 +358,35 @@ export function BookingsClient() {
     if (searchTerm) {
       params.append('search', searchTerm);
     }
-    
-    const exportUrl = `/api/admin/export/bookings?${params.toString()}`;
-    window.open(exportUrl, '_blank');
+
+    // Background export job (non-blocking)
+    try {
+      const res = await fetch('/api/admin/exports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'bookings',
+          params: Object.fromEntries(params.entries()),
+          format: 'csv',
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Failed to start export');
+      }
+
+      toast({
+        title: 'Export started',
+        description: 'Your bookings export is generating. You can continue working and download it from the Exports icon.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Export failed to start',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleBulkStatusUpdate = async () => {

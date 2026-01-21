@@ -229,7 +229,7 @@ interface Bus {
       });
 
       handleCloseDialog();
-      fetchBuses();
+      fetchBuses(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -336,7 +336,7 @@ interface Bus {
 
       setDeleteDialogOpen(false);
       setDeletingBusId(null);
-      fetchBuses();
+      fetchBuses(page, limit);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -356,7 +356,36 @@ interface Bus {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/admin/exports', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'buses',
+                    params: {},
+                    format: 'csv',
+                  }),
+                });
+                if (!res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  throw new Error(data.message || data.error || 'Failed to start export');
+                }
+                toast({
+                  title: 'Export started',
+                  description: 'Your buses export is generating. Download it from the Exports icon when ready.',
+                });
+              } catch (error: any) {
+                toast({
+                  title: 'Export failed to start',
+                  description: error.message || 'Please try again',
+                  variant: 'destructive',
+                });
+              }
+            }}
+          >
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>

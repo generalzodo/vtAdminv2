@@ -445,7 +445,35 @@ export function AgentsClient() {
           <h1 className="text-3xl font-bold">Agents</h1>
           <p className="text-muted-foreground">Manage all agents</p>
         </div>
-        <Button>
+        <Button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/admin/exports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'agents',
+                  params: { tab: activeTab },
+                  format: 'csv',
+                }),
+              });
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || data.error || 'Failed to start export');
+              }
+              toast({
+                title: 'Export started',
+                description: 'Your agents export is generating. Download it from the Exports icon when ready.',
+              });
+            } catch (error: any) {
+              toast({
+                title: 'Export failed to start',
+                description: error.message || 'Please try again',
+                variant: 'destructive',
+              });
+            }
+          }}
+        >
           <Download className="mr-2 h-4 w-4" />
           Export
         </Button>

@@ -21,20 +21,27 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { usePermissions as usePermissionsContext } from '@/contexts/permissions-context';
+import { useRole, useHasRole } from '@/hooks/use-role';
+import { useHasPermission } from '@/hooks/use-permissions';
+import { FileText, BarChart3, ClipboardList } from 'lucide-react';
 
-const menuItems = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Users', url: '/users', icon: Users },
-  { title: 'Agents', url: '/agents', icon: UserCheck },
-  { title: 'Bookings', url: '/bookings', icon: Calendar },
-  { title: 'Routes', url: '/routes', icon: Route },
-  { title: 'Trips', url: '/trips', icon: Calendar },
-  { title: 'Withdrawals', url: '/withdrawals', icon: Wallet },
-  { title: 'Reviews', url: '/reviews', icon: Star },
-  { title: 'Buses', url: '/buses', icon: Bus },
-  { title: 'Transport Officers', url: '/drivers', icon: UserCog },
-  // { title: 'Sub Routes', url: '/subroutes', icon: Route },
-  { title: 'Settings', url: '/settings', icon: Settings },
+// All possible menu items with their required permissions/roles
+const allMenuItems = [
+  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
+  { title: 'Users', url: '/users', icon: Users, permission: 'users.view' },
+  { title: 'Agents', url: '/agents', icon: UserCheck, permission: 'agents.view' },
+  { title: 'Bookings', url: '/bookings', icon: Calendar, permission: 'bookings.view' },
+  { title: 'CSO Dashboard', url: '/cso', icon: Calendar, role: 'cso' },
+  { title: 'Manifests', url: '/manifests', icon: ClipboardList, permission: 'manifests.view' },
+  { title: 'Routes', url: '/routes', icon: Route, permission: 'routes.view' },
+  { title: 'Trips', url: '/trips', icon: Calendar, permission: 'trips.view' },
+  { title: 'Withdrawals', url: '/withdrawals', icon: Wallet, permission: 'withdrawals.view' },
+  { title: 'Reviews', url: '/reviews', icon: Star, permission: 'reviews.view' },
+  { title: 'Buses', url: '/buses', icon: Bus, permission: 'buses.view' },
+  { title: 'Transport Officers', url: '/drivers', icon: UserCog, permission: 'drivers.view' },
+  { title: 'Reports', url: '/reports', icon: BarChart3, permission: 'reports.view' },
+  { title: 'Audit Logs', url: '/audit', icon: FileText, permission: 'audit.view' },
+  { title: 'Settings', url: '/settings', icon: Settings, permission: 'settings.view' },
 ];
 
 const superAdminMenuItems = [
@@ -50,15 +57,66 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const [pendingAgentsCount, setPendingAgentsCount] = useState(0);
   const { permissions, loading: permissionsLoading } = usePermissionsContext();
+  const { role } = useRole();
   const isSuperAdmin = permissions?.isSuperAdmin || false;
   
-  // Debug: Log super admin status
-  useEffect(() => {
-    if (!permissionsLoading) {
-      console.log('Sidebar - Permissions:', permissions);
-      console.log('Sidebar - isSuperAdmin:', isSuperAdmin);
+  // Hooks must be called at top level - create helper functions for permission checks
+  const checkHasRole = (roleName: string) => {
+    if (!permissions || permissionsLoading) return false;
+    return role === roleName;
+  };
+  
+  const checkHasPermission = (permissionName: string) => {
+    if (!permissions || permissionsLoading) return false;
+    if (isSuperAdmin) return true; // Super admin has all permissions
+    return permissions.effectivePermissions?.includes(permissionName) || 
+           permissions.effectivePermissions?.includes('*');
+  };
+  
+  // Filter menu items based on role and permissions
+  const visibleMenuItems = allMenuItems.filter(item => {
+    // Show all items while loading for super admin (optimistic rendering)
+    // Otherwise wait for permissions to load
+    if (permissionsLoading) {
+      // If we don't have permissions yet, don't show anything
+      return false;
     }
-  }, [permissions, isSuperAdmin, permissionsLoading]);
+    
+    if (!permissions) {
+      // Only log once when permissions become null (not on every render)
+      return false;
+    }
+    
+    // Super admin sees everything
+    if (isSuperAdmin) {
+      return true;
+    }
+    
+    // Check role-specific items
+    if (item.role) {
+      return checkHasRole(item.role);
+    }
+    
+    // Check permission-based items
+    if (item.permission) {
+      return checkHasPermission(item.permission);
+    }
+    
+    return false;
+  });
+  
+  // Debug: Log detailed information
+  useEffect(() => {
+    console.log('🔍 [SIDEBAR DEBUG]', {
+      permissionsLoading,
+      permissions,
+      role,
+      isSuperAdmin,
+      visibleMenuItemsCount: visibleMenuItems.length,
+      allMenuItemsCount: allMenuItems.length,
+      effectivePermissions: permissions?.effectivePermissions,
+    });
+  }, [permissions, isSuperAdmin, permissionsLoading, visibleMenuItems.length, role]);
 
   useEffect(() => {
     let countCache: { value: number; timestamp: number } | null = null;
@@ -109,8 +167,20 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
         
         <Separator className="my-4 bg-green-900" />
         
-        <ul className="space-y-2">
-          {menuItems.map((item) => {
+        {permissionsLoading ? (
+          <div className="px-3 py-4 text-green-100 text-sm">
+            Loading menu...
+          </div>
+        ) : visibleMenuItems.length === 0 ? (
+          <div className="px-3 py-4 text-green-100 text-sm">
+            <p className="text-yellow-300 mb-2">⚠️ No menu items available</p>
+            <p className="text-xs text-green-200">
+              Check console for debug info
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.url || pathname.startsWith(item.url + '/');
             const showBadge = item.url === '/agents' && pendingAgentsCount > 0;
@@ -165,7 +235,8 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
               })}
             </>
           )}
-        </ul>
+          </ul>
+        )}
       </div>
     </aside>
   );

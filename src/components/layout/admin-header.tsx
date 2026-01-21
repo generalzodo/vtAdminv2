@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { AdminSidebar } from './admin-sidebar';
 import { logoutAction } from '@/app/auth/actions';
 import { useRouter } from 'next/navigation';
+import { ExportNotifications } from '@/components/admin/export-notifications';
 
 interface AdminHeaderProps {
   user: {
@@ -49,6 +50,7 @@ export function AdminHeader({ user }: AdminHeaderProps) {
       </Sheet>
 
       <div className="flex flex-1 items-center justify-end gap-4">
+        <ExportNotifications />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">

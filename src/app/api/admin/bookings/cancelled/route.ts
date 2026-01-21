@@ -15,15 +15,19 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') || '10';
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const status = searchParams.get('status');
     const paymentStatus = searchParams.get('paymentStatus');
     const userType = searchParams.get('userType');
+    const search = searchParams.get('search');
 
     // Backend now supports pagination and filters
     const params = new URLSearchParams();
     if (from) params.append('from', from);
     if (to) params.append('to', to);
+    if (status) params.append('status', status);
     if (paymentStatus) params.append('paymentStatus', paymentStatus);
     if (userType) params.append('userType', userType);
+    if (search) params.append('search', search);
     params.append('page', page);
     params.append('limit', limit);
 

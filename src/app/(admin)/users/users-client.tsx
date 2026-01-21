@@ -395,7 +395,36 @@ export function UsersClient() {
         </div>
         <div className="flex gap-2">
           <PermissionGate permission="users.view">
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/admin/exports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'users',
+                      params: {},
+                      format: 'csv',
+                    }),
+                  });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.message || data.error || 'Failed to start export');
+                  }
+                  toast({
+                    title: 'Export started',
+                    description: 'Your users export is generating. Download it from the Exports icon when ready.',
+                  });
+                } catch (error: any) {
+                  toast({
+                    title: 'Export failed to start',
+                    description: error.message || 'Please try again',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+            >
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>

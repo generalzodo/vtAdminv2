@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface Review {
   _id: string;
@@ -47,6 +48,7 @@ export function ReviewsClient() {
   const [toDate, setToDate] = useState<string>('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const { toast } = useToast();
 
   const fetchReviews = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
@@ -96,7 +98,7 @@ export function ReviewsClient() {
       });
       const data = await response.json();
       if (data.success) {
-        fetchReviews();
+        fetchReviews(page, limit);
       } else {
         console.error('Failed to update review status:', data.error);
       }
@@ -215,7 +217,36 @@ export function ReviewsClient() {
         <div>
           <h1 className="text-2xl font-bold">Passenger Reviews</h1>
         </div>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/admin/exports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'reviews',
+                  params: {},
+                  format: 'csv',
+                }),
+              });
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || data.error || 'Failed to start export');
+              }
+              toast({
+                title: 'Export started',
+                description: 'Your reviews export is generating. Download it from the Exports icon when ready.',
+              });
+            } catch (error: any) {
+              toast({
+                title: 'Export failed to start',
+                description: error.message || 'Please try again',
+                variant: 'destructive',
+              });
+            }
+          }}
+        >
           <Download className="mr-2 h-4 w-4" />
           Export
         </Button>
@@ -253,7 +284,15 @@ export function ReviewsClient() {
               <Input
                 type="date"
                 value={fromDate}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const newFromDate = e.target.value;
+                  setFromDate(newFromDate);
+                  // Clear toDate if it's before the new fromDate
+                  if (toDate && newFromDate && toDate < newFromDate) {
+                    setToDate('');
+                  }
+                }}
+                max={toDate || undefined}
                 className="w-[180px]"
                 placeholder="From Date"
               />
@@ -261,6 +300,7 @@ export function ReviewsClient() {
                 type="date"
                 value={toDate}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)}
+                min={fromDate || undefined}
                 className="w-[180px]"
                 placeholder="To Date"
               />

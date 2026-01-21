@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 export interface UserPermissions {
   isSuperAdmin: boolean;
+  role: string | null;
   effectivePermissions: string[];
 }
 
@@ -30,12 +31,22 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/admin/auth/permissions', {
         credentials: 'include',
       });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ [PERMISSIONS CONTEXT] Permissions fetched:', data);
         setPermissions(data.data);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ [PERMISSIONS CONTEXT] Failed to fetch permissions:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        setPermissions(null);
       }
     } catch (error) {
-      console.error('Error fetching permissions:', error);
+      console.error('❌ [PERMISSIONS CONTEXT] Exception fetching permissions:', error);
       setPermissions(null);
     } finally {
       setLoading(false);

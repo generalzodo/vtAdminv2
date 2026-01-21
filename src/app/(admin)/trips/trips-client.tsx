@@ -902,7 +902,7 @@ export function TripsClient() {
         <div className="flex gap-2">
           <Button 
             variant="outline"
-            onClick={() => {
+            onClick={async () => {
               const params = new URLSearchParams();
               
               // Add date range
@@ -920,9 +920,34 @@ export function TripsClient() {
               // Add filters
               if (statusFilter !== 'all') params.append('status', statusFilter);
               if (routeFilter !== 'all') params.append('route', routeFilter);
-              
-              const exportUrl = `/api/admin/export/trips?${params.toString()}`;
-              window.open(exportUrl, '_blank');
+
+              try {
+                const res = await fetch('/api/admin/exports', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'trips',
+                    params: Object.fromEntries(params.entries()),
+                    format: 'csv',
+                  }),
+                });
+
+                if (!res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  throw new Error(data.message || data.error || 'Failed to start export');
+                }
+
+                toast({
+                  title: 'Export started',
+                  description: 'Your trips export is generating. You can continue working and download it from the Exports icon.',
+                });
+              } catch (error: any) {
+                toast({
+                  title: 'Export failed to start',
+                  description: error.message || 'Please try again',
+                  variant: 'destructive',
+                });
+              }
             }}
           >
             <Download className="mr-2 h-4 w-4" />

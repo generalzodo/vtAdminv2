@@ -66,6 +66,13 @@ export function DashboardClient() {
     fetchStats();
   }, [dateRange, customStartDate, customEndDate]);
 
+  // Clear end date if it becomes invalid when start date changes
+  useEffect(() => {
+    if (dateRange === 'custom' && customStartDate && customEndDate && customEndDate < customStartDate) {
+      setCustomEndDate(undefined);
+    }
+  }, [customStartDate, dateRange, customEndDate]);
+
   const getDateRange = () => {
     if (dateRange === 'all') {
       return { from: null, to: null };

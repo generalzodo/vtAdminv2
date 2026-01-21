@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const paymentStatus = searchParams.get('paymentStatus');
     const userType = searchParams.get('userType');
+    const search = searchParams.get('search');
 
     // Backend now supports pagination and filters
     const params = new URLSearchParams();
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
     if (status) params.append('status', status);
     if (paymentStatus) params.append('paymentStatus', paymentStatus);
     if (userType) params.append('userType', userType);
+    if (search) params.append('search', search);
 
     const response = await fetch(`${API_BASE_URL}booking/altered?${params.toString()}`, {
       headers: {
