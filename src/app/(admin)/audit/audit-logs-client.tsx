@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useHasPermission } from '@/hooks/use-permissions';
+import { useHasPermission, useIsSuperAdmin } from '@/hooks/use-permissions';
 import { useIsACO } from '@/hooks/use-role';
 import { FileText, Download, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -21,12 +21,13 @@ export function AuditLogsClient() {
     to: ''
   });
   
+  const isSuperAdmin = useIsSuperAdmin();
   const isACO = useIsACO();
   const canViewAudit = useHasPermission('audit.view');
   const canExport = useHasPermission('audit.export');
   const { toast } = useToast();
 
-  const hasAccess = isACO || canViewAudit;
+  const hasAccess = isSuperAdmin || isACO || canViewAudit;
 
   useEffect(() => {
     if (!hasAccess) {
@@ -109,7 +110,7 @@ export function AuditLogsClient() {
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              You must have Audit & Compliance Officer role or audit.view permission to access this page.
+              You must have Audit & Compliance Officer role, audit.view permission, or be a Super Admin to access this page.
             </CardDescription>
           </CardHeader>
         </Card>

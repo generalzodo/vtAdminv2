@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePermissions as usePermissionsContext } from '@/contexts/permissions-context';
 import { useRole, useHasRole } from '@/hooks/use-role';
 import { useHasPermission } from '@/hooks/use-permissions';
-import { FileText, BarChart3, ClipboardList } from 'lucide-react';
+import { FileText, BarChart3 } from 'lucide-react';
 
 // All possible menu items with their required permissions/roles
 const allMenuItems = [
@@ -32,7 +32,6 @@ const allMenuItems = [
   { title: 'Agents', url: '/agents', icon: UserCheck, permission: 'agents.view' },
   { title: 'Bookings', url: '/bookings', icon: Calendar, permission: 'bookings.view' },
   { title: 'CSO Dashboard', url: '/cso', icon: Calendar, role: 'cso' },
-  { title: 'Manifests', url: '/manifests', icon: ClipboardList, permission: 'manifests.view' },
   { title: 'Routes', url: '/routes', icon: Route, permission: 'routes.view' },
   { title: 'Trips', url: '/trips', icon: Calendar, permission: 'trips.view' },
   { title: 'Withdrawals', url: '/withdrawals', icon: Wallet, permission: 'withdrawals.view' },

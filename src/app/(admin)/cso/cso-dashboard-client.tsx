@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useHasPermission } from '@/hooks/use-permissions';
+import { useHasPermission, useIsSuperAdmin } from '@/hooks/use-permissions';
 import { useIsCSO } from '@/hooks/use-role';
 import { API_BASE_URL } from '@/lib/config';
 import { Calendar, DollarSign, Users, FileText } from 'lucide-react';
@@ -20,11 +20,12 @@ export function CSODashboardClient() {
     todayRevenue: 0
   });
   
+  const isSuperAdmin = useIsSuperAdmin();
   const isCSO = useIsCSO();
   const canViewAll = useHasPermission('bookings.view_all');
 
   useEffect(() => {
-    if (!isCSO) {
+    if (!isCSO && !isSuperAdmin) {
       return;
     }
     
@@ -71,13 +72,13 @@ export function CSODashboardClient() {
     }
   };
 
-  if (!isCSO) {
+  if (!isCSO && !isSuperAdmin) {
     return (
       <div className="p-6">
         <Card>
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You must have CSO role to access this page.</CardDescription>
+            <CardDescription>You must have CSO role or be a Super Admin to access this page.</CardDescription>
           </CardHeader>
         </Card>
       </div>

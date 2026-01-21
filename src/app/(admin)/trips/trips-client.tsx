@@ -36,6 +36,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useHasPermission, useIsSuperAdmin } from '@/hooks/use-permissions';
+import { useIsSM } from '@/hooks/use-role';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,6 +127,12 @@ export function TripsClient() {
   const [onboardingAll, setOnboardingAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const { toast } = useToast();
+  
+  // Manifest permissions
+  const isSuperAdmin = useIsSuperAdmin();
+  const isSM = useIsSM();
+  const canClose = useHasPermission('manifests.close');
+  const canSubmit = useHasPermission('manifests.submit');
 
   // Reset to page 1 when filters change (but not when page changes)
   useEffect(() => {
@@ -551,29 +559,30 @@ export function TripsClient() {
 
   const fetchTripManifest = async (tripId: string) => {
     try {
-      const response = await fetch(`/api/admin/trips/${tripId}/manifest`);
+      const response = await fetch(`/api/admin/manifests/${tripId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch trip manifest');
       }
       const data = await response.json();
-      if (data.success) {
+      if (data.success || data.trip) {
+        const tripData = data.trip || data;
         // Find the original trip to preserve title and other fields
         const originalTrip = trips.find(t => t._id === tripId);
         setCurrentManifestTrip({
           ...originalTrip,
-          ...data.trip,
-          title: originalTrip?.title || data.trip.title,
+          ...tripData,
+          title: originalTrip?.title || tripData.title,
         });
-        setManifestBookings(data.bookings || []);
+        setManifestBookings(data.bookings || tripData.bookings || []);
         
         // Find matching driver if transportOfficerName exists
         let selectedDriverId = '';
-        if (data.trip?.transportOfficerName && drivers.length > 0) {
+        if (tripData?.transportOfficerName && drivers.length > 0) {
           const matchingDriver = drivers.find((d) => {
             const fullName = `${d.firstName} ${d.lastName}`.trim();
-            return fullName === data.trip.transportOfficerName ||
-                   d.firstName === data.trip.transportOfficerName ||
-                   d.lastName === data.trip.transportOfficerName;
+            return fullName === tripData.transportOfficerName ||
+                   d.firstName === tripData.transportOfficerName ||
+                   d.lastName === tripData.transportOfficerName;
           });
           if (matchingDriver) {
             selectedDriverId = matchingDriver._id;
@@ -582,7 +591,7 @@ export function TripsClient() {
         
         setManifestFormData({
           selectedDriverId,
-          vehicleNo: data.trip?.vehicleNo || '',
+          vehicleNo: tripData?.vehicleNo || '',
         });
       }
     } catch (error: any) {
@@ -608,7 +617,7 @@ export function TripsClient() {
         }
       }
 
-      const response = await fetch(`/api/admin/trips/${currentManifestTrip._id}/manifest`, {
+      const response = await fetch(`/api/admin/manifests/${currentManifestTrip._id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -1476,6 +1485,114 @@ export function TripsClient() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Manifest Actions (Close/Submit) */}
+            {(isSM || isSuperAdmin) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manifest Actions</CardTitle>
+                  <CardDescription>
+                    Close and submit manifest to QuickBooks
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {currentManifestTrip?.isLocked ? (
+                    <div className="text-sm text-muted-foreground p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="font-semibold text-yellow-800 mb-1">Manifest is Locked</p>
+                      <p>This manifest has been submitted and cannot be edited.</p>
+                      {currentManifestTrip?.submittedAt && (
+                        <p className="mt-2 text-xs">
+                          Submitted on: {new Date(currentManifestTrip.submittedAt).toLocaleString()}
+                        </p>
+                      )}
+                      {currentManifestTrip?.financialData && (
+                        <div className="mt-3 pt-3 border-t border-yellow-200">
+                          <p className="font-semibold text-sm mb-1">Financial Summary:</p>
+                          <div className="text-xs space-y-1">
+                            <p>Total Revenue: ₦{currentManifestTrip.financialData.totalRevenue?.toLocaleString() || 0}</p>
+                            <p>Total Fare: ₦{currentManifestTrip.financialData.totalFare?.toLocaleString() || 0}</p>
+                            <p>Luggage Fees: ₦{currentManifestTrip.financialData.luggageFees?.toLocaleString() || 0}</p>
+                            <p>Waybill Fees: ₦{currentManifestTrip.financialData.waybillFees?.toLocaleString() || 0}</p>
+                            <p>Bookings: {currentManifestTrip.financialData.bookingCount || 0}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {(canClose || isSuperAdmin) && (
+                        <Button 
+                          variant="outline" 
+                          onClick={async () => {
+                            if (!currentManifestTrip?._id) return;
+                            if (!confirm('Are you sure you want to close this manifest? This will prevent further passenger check-ins.')) {
+                              return;
+                            }
+                            try {
+                              const res = await fetch(`/api/admin/manifests/${currentManifestTrip._id}/close`, {
+                                method: 'POST',
+                                credentials: 'include'
+                              });
+                              if (res.ok) {
+                                toast({
+                                  title: 'Success',
+                                  description: 'Manifest closed successfully',
+                                });
+                                await fetchTripManifest(currentManifestTrip._id);
+                              } else {
+                                throw new Error('Failed to close manifest');
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: 'Error',
+                                description: error.message || 'Failed to close manifest',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          Close Manifest
+                        </Button>
+                      )}
+                      {(canSubmit || isSuperAdmin) && (
+                        <Button 
+                          onClick={async () => {
+                            if (!currentManifestTrip?._id) return;
+                            if (!confirm('Are you sure you want to submit this manifest to QuickBooks? This will lock the manifest and prevent further edits.')) {
+                              return;
+                            }
+                            try {
+                              const res = await fetch(`/api/admin/manifests/${currentManifestTrip._id}/submit`, {
+                                method: 'POST',
+                                credentials: 'include'
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                toast({
+                                  title: 'Success',
+                                  description: `Manifest submitted successfully! Total Revenue: ₦${data.financialData?.totalRevenue?.toLocaleString() || 0}`,
+                                });
+                                await fetchTripManifest(currentManifestTrip._id);
+                              } else {
+                                throw new Error('Failed to submit manifest');
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: 'Error',
+                                description: error.message || 'Failed to submit manifest',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          Submit to QuickBooks
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </DialogContent>
       </Dialog>

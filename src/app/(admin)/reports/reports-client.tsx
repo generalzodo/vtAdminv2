@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useHasPermission } from '@/hooks/use-permissions';
+import { useHasPermission, useIsSuperAdmin } from '@/hooks/use-permissions';
 import { useIsFinance, useIsACO, useIsSO, useIsITO } from '@/hooks/use-role';
 import { BarChart3, DollarSign, Users, Bus } from 'lucide-react';
 
@@ -12,13 +12,14 @@ export function ReportsClient() {
   const [reportData, setReportData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('financial');
   
+  const isSuperAdmin = useIsSuperAdmin();
   const isFinance = useIsFinance();
   const isACO = useIsACO();
   const isSO = useIsSO();
   const isITO = useIsITO();
   const canViewReports = useHasPermission('reports.view');
 
-  const hasAccess = isFinance || isACO || isSO || isITO || canViewReports;
+  const hasAccess = isSuperAdmin || isFinance || isACO || isSO || isITO || canViewReports;
 
   const fetchReport = async (reportType: string, filters: any = {}) => {
     try {
@@ -58,7 +59,7 @@ export function ReportsClient() {
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              You must have appropriate role to access reports.
+              You must have appropriate role or be a Super Admin to access reports.
             </CardDescription>
           </CardHeader>
         </Card>
