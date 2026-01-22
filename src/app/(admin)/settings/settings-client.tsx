@@ -7,8 +7,9 @@ import { LocationsTab } from './tabs/locations-tab';
 import { PricesTab } from './tabs/prices-tab';
 import { TermsTab } from './tabs/terms-tab';
 import { CommissionTab } from './tabs/commission-tab';
+import { PopupTab } from './tabs/popup-tab';
 
-type TabType = 'general' | 'locations' | 'prices' | 'terms' | 'commission';
+type TabType = 'general' | 'locations' | 'prices' | 'terms' | 'commission' | 'popup';
 
 export function SettingsClient() {
   const [currentTab, setCurrentTab] = useState<TabType>('locations');
@@ -19,6 +20,7 @@ export function SettingsClient() {
     { id: 'prices' as TabType, label: 'Price Setting', description: 'Manage Prices' },
     { id: 'terms' as TabType, label: 'Terms & Conditions', description: 'Manage Terms and Conditions' },
     { id: 'commission' as TabType, label: 'Agent Commission', description: 'Manage Bus Commission Rates' },
+    { id: 'popup' as TabType, label: 'Popup Settings', description: 'Manage website popup' },
   ];
 
   return (
@@ -64,6 +66,7 @@ export function SettingsClient() {
               {currentTab === 'prices' && <PricesTab />}
               {currentTab === 'terms' && <TermsTab />}
               {currentTab === 'commission' && <CommissionTab />}
+              {currentTab === 'popup' && <PopupTab />}
             </CardContent>
           </Card>
         </div>
