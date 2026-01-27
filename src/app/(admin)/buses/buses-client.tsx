@@ -366,7 +366,7 @@ interface Bus {
                   body: JSON.stringify({
                     type: 'buses',
                     params: {},
-                    format: 'csv',
+                    format: 'xlsx',
                   }),
                 });
                 if (!res.ok) {

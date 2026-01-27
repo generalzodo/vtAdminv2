@@ -8,14 +8,15 @@ import { PricesTab } from './tabs/prices-tab';
 import { TermsTab } from './tabs/terms-tab';
 import { CommissionTab } from './tabs/commission-tab';
 import { PopupTab } from './tabs/popup-tab';
+import { BrandingTab } from './tabs/branding-tab';
 
-type TabType = 'general' | 'locations' | 'prices' | 'terms' | 'commission' | 'popup';
+type TabType = 'branding' | 'locations' | 'prices' | 'terms' | 'commission' | 'popup';
 
 export function SettingsClient() {
-  const [currentTab, setCurrentTab] = useState<TabType>('locations');
+  const [currentTab, setCurrentTab] = useState<TabType>('branding');
 
   const tabs = [
-    // { id: 'general' as TabType, label: 'General Setting', description: 'System General Settings' },
+    { id: 'branding' as TabType, label: 'Branding', description: 'Company identity & theme' },
     { id: 'locations' as TabType, label: 'Location Setting', description: 'Manage available locations' },
     { id: 'prices' as TabType, label: 'Price Setting', description: 'Manage Prices' },
     { id: 'terms' as TabType, label: 'Terms & Conditions', description: 'Manage Terms and Conditions' },
@@ -56,12 +57,7 @@ export function SettingsClient() {
         <div className="lg:w-3/4 w-full p-0">
           <Card>
             <CardContent className="p-6">
-              {currentTab === 'general' && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">General Settings</h2>
-                  <p className="text-muted-foreground">Coming soon!</p>
-                </div>
-              )}
+              {currentTab === 'branding' && <BrandingTab />}
               {currentTab === 'locations' && <LocationsTab />}
               {currentTab === 'prices' && <PricesTab />}
               {currentTab === 'terms' && <TermsTab />}

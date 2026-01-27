@@ -367,7 +367,7 @@ export function BookingsClient() {
         body: JSON.stringify({
           type: 'bookings',
           params: Object.fromEntries(params.entries()),
-          format: 'csv',
+          format: 'xlsx',
         }),
       });
 

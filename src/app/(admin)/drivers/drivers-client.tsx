@@ -328,7 +328,7 @@ export function DriversClient() {
                   body: JSON.stringify({
                     type: 'drivers',
                     params: {},
-                    format: 'csv',
+                    format: 'xlsx',
                   }),
                 });
                 if (!res.ok) {

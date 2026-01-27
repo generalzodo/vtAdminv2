@@ -24,6 +24,7 @@ import { usePermissions as usePermissionsContext } from '@/contexts/permissions-
 import { useRole, useHasRole } from '@/hooks/use-role';
 import { useHasPermission } from '@/hooks/use-permissions';
 import { FileText, BarChart3 } from 'lucide-react';
+import { tenantConfig } from '@/lib/tenant-config';
 
 // All possible menu items with their required permissions/roles
 const allMenuItems = [
@@ -160,7 +161,7 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
     )}>
       <div className="overflow-y-auto py-5 px-3 h-full w-full">
         <div className="mb-6 px-3">
-          <h2 className="text-xl font-bold text-white">Victoria Travels</h2>
+          <h2 className="text-xl font-bold text-white">{tenantConfig.companyName}</h2>
           <p className="text-sm text-green-100">Admin Panel</p>
         </div>
         

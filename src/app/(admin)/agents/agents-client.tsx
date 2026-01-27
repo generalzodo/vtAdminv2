@@ -454,7 +454,7 @@ export function AgentsClient() {
                 body: JSON.stringify({
                   type: 'agents',
                   params: { tab: activeTab },
-                  format: 'csv',
+                  format: 'xlsx',
                 }),
               });
               if (!res.ok) {

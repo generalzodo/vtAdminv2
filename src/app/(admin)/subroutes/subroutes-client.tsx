@@ -458,7 +458,7 @@ export function SubRoutesClient() {
                   body: JSON.stringify({
                     type: 'subroutes',
                     params: {},
-                    format: 'csv',
+                    format: 'xlsx',
                   }),
                 });
                 if (!res.ok) {

@@ -405,7 +405,7 @@ export function UsersClient() {
                     body: JSON.stringify({
                       type: 'users',
                       params: {},
-                      format: 'csv',
+                      format: 'xlsx',
                     }),
                   });
                   if (!res.ok) {

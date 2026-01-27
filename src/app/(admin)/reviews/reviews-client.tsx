@@ -227,7 +227,7 @@ export function ReviewsClient() {
                 body: JSON.stringify({
                   type: 'reviews',
                   params: {},
-                  format: 'csv',
+                  format: 'xlsx',
                 }),
               });
               if (!res.ok) {

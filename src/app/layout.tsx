@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { tenantConfig } from '@/lib/tenant-config';
 
 export const metadata: Metadata = {
-  title: 'Victoria Travels Admin - Dashboard',
-  description: 'Admin panel for Victoria Travels',
+  title: `${tenantConfig.companyName} Admin - Dashboard`,
+  description: `Admin panel for ${tenantConfig.companyName}`,
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',

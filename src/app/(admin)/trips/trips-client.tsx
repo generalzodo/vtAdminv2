@@ -937,7 +937,7 @@ export function TripsClient() {
                   body: JSON.stringify({
                     type: 'trips',
                     params: Object.fromEntries(params.entries()),
-                    format: 'csv',
+                    format: 'xlsx',
                   }),
                 });
 

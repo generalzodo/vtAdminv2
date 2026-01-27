@@ -80,7 +80,7 @@ export function AuditLogsClient() {
         body: JSON.stringify({
           type: 'auditLogs',
           params: Object.fromEntries(params.entries()),
-          format: 'csv',
+          format: 'xlsx',
         }),
       });
 

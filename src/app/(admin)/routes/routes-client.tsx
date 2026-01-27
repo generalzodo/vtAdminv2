@@ -926,7 +926,7 @@ export function RoutesClient() {
                   body: JSON.stringify({
                     type: 'routes',
                     params: {},
-                    format: 'csv',
+                    format: 'xlsx',
                   }),
                 });
                 if (!res.ok) {
