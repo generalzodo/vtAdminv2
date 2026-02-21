@@ -38,6 +38,7 @@ const allMenuItems = [
   { title: 'Withdrawals', url: '/withdrawals', icon: Wallet, permission: 'withdrawals.view' },
   { title: 'Reviews', url: '/reviews', icon: Star, permission: 'reviews.view' },
   { title: 'Buses', url: '/buses', icon: Bus, permission: 'buses.view' },
+  { title: 'Bus Types', url: '/bus-types', icon: Bus, permission: 'bus-types.view' },
   { title: 'Transport Officers', url: '/drivers', icon: UserCog, permission: 'drivers.view' },
   { title: 'Reports', url: '/reports', icon: BarChart3, permission: 'reports.view' },
   { title: 'Audit Logs', url: '/audit', icon: FileText, permission: 'audit.view' },

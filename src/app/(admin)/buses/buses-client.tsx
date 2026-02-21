@@ -37,6 +37,7 @@ import {
 
 export function BusesClient() {
   const [buses, setBuses] = useState<Bus[]>([]);
+  const [busTypeOptions, setBusTypeOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -56,6 +57,7 @@ export function BusesClient() {
     type: '',
     seats: '',
     photo: '',
+    busType: '',
   });
   const [seatLayout, setSeatLayout] = useState<string[]>(['STEERING']);
   const [lastAddedIndex, setLastAddedIndex] = useState<number | null>(null);
@@ -71,6 +73,18 @@ export function BusesClient() {
     { title: 'JAC' },
     { title: 'Cargo 1' }
   ];
+
+  const fetchBusTypes = async () => {
+    try {
+      const response = await fetch('/api/admin/bus-types/public/all');
+      const data = await response.json();
+      if (data.success) {
+        setBusTypeOptions(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching bus types:', error);
+    }
+  };
 
   const fetchBuses = async (currentPage: number, currentLimit: number) => {
     setLoading(true);
@@ -106,6 +120,7 @@ export function BusesClient() {
 
   useEffect(() => {
     fetchBuses(page, limit);
+    fetchBusTypes();
   }, [page, limit, statusFilter, typeFilter, searchTerm]);
 
   const getStatusBadge = (status: string) => {
@@ -128,6 +143,7 @@ interface Bus {
   plateNumber?: string;
   model?: string;
   type?: string;
+  busType?: any;
   seats?: number;
   capacity?: number;
   photo?: string;
@@ -151,6 +167,7 @@ interface Bus {
         type: bus.type || '',
         seats: bus.seats?.toString() || '',
         photo: bus.photo || '',
+        busType: (bus as any).busType?._id || '',
       });
       setSeatLayout((bus as any).seatLayout ? [...(bus as any).seatLayout] : ['STEERING']);
     } else {
@@ -160,6 +177,7 @@ interface Bus {
         type: '',
         seats: '',
         photo: '',
+        busType: '',
       });
       setSeatLayout(['STEERING']);
     }
@@ -175,6 +193,7 @@ interface Bus {
       type: '',
       seats: '',
       photo: '',
+      busType: '',
     });
     setSeatLayout(['STEERING']);
     setFormErrors({});
@@ -203,6 +222,7 @@ interface Bus {
         type: formData.type,
         seats: parseInt(formData.seats),
         photo: formData.photo,
+        busType: formData.busType || null,
         seatLayout: seatLayout,
       };
 
@@ -435,9 +455,13 @@ interface Bus {
               { 
                 key: 'photo', 
                 header: 'Image', 
-                cell: (row: any) => row.photo ? (
-                  <img src={row.photo} alt={row.title} className="h-10 w-10 object-cover rounded" />
-                ) : 'N/A'
+                cell: (row: any) => {
+                  const imageUrl = row.busType?.image || row.photo;
+                  console.log('Bus row:', row.title, 'busType:', row.busType, 'image:', imageUrl);
+                  return imageUrl ? (
+                    <img src={imageUrl} alt={row.title} className="h-10 w-10 object-cover rounded" />
+                  ) : 'N/A'
+                }
               },
               { key: 'seats', header: 'Seats', cell: (row) => row.seats || 'N/A' },
               { 
@@ -538,17 +562,30 @@ interface Bus {
               <Label htmlFor="type">Type *</Label>
               <Select
                 value={formData.type}
-                onValueChange={(value) => setFormData({ ...formData, type: value })}
+                onValueChange={(value) => {
+                  const selectedBusType = busTypeOptions.find(type => type.name === value);
+                  setFormData({ 
+                    ...formData, 
+                    type: value,
+                    busType: selectedBusType?._id || '',
+                  });
+                }}
               >
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select bus type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {busTypes.map((type) => (
-                    <SelectItem key={type.title} value={type.title}>
-                      {type.title}
+                  {busTypeOptions.length > 0 ? (
+                    busTypeOptions.map((type) => (
+                      <SelectItem key={type._id} value={type.name}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem disabled value="no-types">
+                      No bus types available
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
               {formErrors.type && (
