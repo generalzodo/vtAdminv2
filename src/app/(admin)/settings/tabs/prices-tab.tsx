@@ -13,8 +13,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Edit } from 'lucide-react';
+import { Edit, X } from 'lucide-react';
 
 interface Price {
   _id: string;
@@ -48,24 +55,40 @@ export function PricesTab() {
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [allPrices, setAllPrices] = useState<Price[]>([]);
+  const [originFilter, setOriginFilter] = useState<string>('');
+  const [destinationFilter, setDestinationFilter] = useState<string>('');
   const { toast } = useToast();
+
+  // Extract unique origins and destinations for filter dropdowns
+  const uniqueOrigins = [...new Set(allPrices.map(p => p.origin).filter(Boolean))].sort();
+  const uniqueDestinations = [...new Set(allPrices.map(p => p.destination).filter(Boolean))].sort();
 
   useEffect(() => {
     fetchPrices();
   }, []);
 
   useEffect(() => {
-    // Reset to first page when search changes
+    // Reset to first page when search or filters change
     setPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, originFilter, destinationFilter]);
 
   useEffect(() => {
-    // Filter and paginate prices when page, limit, or search changes
+    // Filter and paginate prices when page, limit, search, or filters change
     filterAndPaginatePrices();
-  }, [page, limit, searchTerm, allPrices]);
+  }, [page, limit, searchTerm, originFilter, destinationFilter, allPrices]);
 
   const filterAndPaginatePrices = () => {
     let filteredPrices = [...allPrices];
+    
+    // Apply origin filter
+    if (originFilter) {
+      filteredPrices = filteredPrices.filter((price: any) => price.origin === originFilter);
+    }
+    
+    // Apply destination filter
+    if (destinationFilter) {
+      filteredPrices = filteredPrices.filter((price: any) => price.destination === destinationFilter);
+    }
     
     // Apply search filter
     if (searchTerm && searchTerm.trim()) {
@@ -209,6 +232,64 @@ export function PricesTab() {
           <h2 className="text-2xl font-bold">Price Management</h2>
           <p className="text-muted-foreground">Manage prices for routes</p>
         </div>
+      </div>
+
+      {/* Origin and Destination Filters */}
+      <div className="flex flex-wrap gap-4 items-end">
+        <div className="w-[200px]">
+          <Label className="mb-2 block text-sm font-medium">Origin</Label>
+          <Select
+            value={originFilter || '__all__'}
+            onValueChange={(val) => setOriginFilter(val === '__all__' ? '' : val)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Origins" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Origins</SelectItem>
+              {uniqueOrigins.map((origin) => (
+                <SelectItem key={origin} value={origin}>
+                  {origin}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="w-[200px]">
+          <Label className="mb-2 block text-sm font-medium">Destination</Label>
+          <Select
+            value={destinationFilter || '__all__'}
+            onValueChange={(val) => setDestinationFilter(val === '__all__' ? '' : val)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Destinations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Destinations</SelectItem>
+              {uniqueDestinations.map((destination) => (
+                <SelectItem key={destination} value={destination}>
+                  {destination}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {(originFilter || destinationFilter) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOriginFilter('');
+              setDestinationFilter('');
+            }}
+            className="h-10"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear Filters
+          </Button>
+        )}
       </div>
 
       <DataTable
