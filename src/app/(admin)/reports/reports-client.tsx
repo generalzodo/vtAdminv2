@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useHasPermission, useIsSuperAdmin } from '@/hooks/use-permissions';
 import { useIsFinance, useIsACO, useIsSO, useIsITO } from '@/hooks/use-role';
-import { BarChart3, DollarSign, Users, Bus } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 export function ReportsClient() {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('financial');
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
   
   const isSuperAdmin = useIsSuperAdmin();
   const isFinance = useIsFinance();
@@ -46,6 +49,50 @@ export function ReportsClient() {
     }
   };
 
+  const createReportExport = async () => {
+    try {
+      setExporting(true);
+      setExportMessage('');
+
+      const typeByTab: Record<string, string> = {
+        financial: 'financialReports',
+        agent: 'agentReports',
+        passenger: 'passengerReports',
+        'bus-performance': 'busPerformanceReports'
+      };
+
+      const exportType = typeByTab[activeTab];
+      if (!exportType) {
+        setExportMessage('Unsupported report type');
+        return;
+      }
+
+      const res = await fetch('/api/admin/exports', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: exportType,
+          format: 'xlsx',
+          params: {}
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setExportMessage(data?.message || data?.error || 'Failed to queue export job');
+        return;
+      }
+
+      setExportMessage('Excel export queued. Use the export bell icon to download when ready.');
+    } catch (error) {
+      console.error('Error creating report export:', error);
+      setExportMessage('Failed to queue export job');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     if (hasAccess && activeTab) {
       fetchReport(activeTab);
@@ -69,11 +116,20 @@ export function ReportsClient() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate and view various reports based on your role
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Reports</h1>
+          <p className="text-muted-foreground">
+            Generate and view various reports based on your role
+          </p>
+          {exportMessage ? (
+            <p className="mt-2 text-sm text-muted-foreground">{exportMessage}</p>
+          ) : null}
+        </div>
+        <Button onClick={createReportExport} disabled={exporting}>
+          <Download className="mr-2 h-4 w-4" />
+          {exporting ? 'Queueing...' : 'Download Excel'}
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

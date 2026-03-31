@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus, MoreHorizontal, Edit, Trash2, CalendarIcon, Users, MapPin, Clock, Bus, UserCheck } from 'lucide-react';
+import { Download, Plus, MoreHorizontal, Edit, Trash2, CalendarIcon, Users, MapPin, Clock, Bus, UserCheck, Printer, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -126,6 +126,7 @@ export function TripsClient() {
   });
   const [onboardingAll, setOnboardingAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [manifestDownloadLoading, setManifestDownloadLoading] = useState(false);
   const { toast } = useToast();
   
   // Manifest permissions
@@ -646,6 +647,57 @@ export function TripsClient() {
         variant: 'destructive',
       });
     }
+  };
+
+  const triggerFileDownload = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleManifestDownload = async (format: 'csv' | 'html') => {
+    if (!currentManifestTrip?._id) return;
+
+    setManifestDownloadLoading(true);
+    try {
+      const response = await fetch(`/api/admin/manifests/${currentManifestTrip._id}/download?format=${format}&disposition=attachment`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to download manifest' }));
+        throw new Error(errorData.error || 'Failed to download manifest');
+      }
+
+      const blob = await response.blob();
+      const extension = format === 'html' ? 'html' : 'csv';
+      const fileName = `manifest_${currentManifestTrip._id}.${extension}`;
+      triggerFileDownload(blob, fileName);
+
+      toast({
+        title: 'Manifest Downloaded',
+        description: `Downloaded ${format.toUpperCase()} manifest successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Download Failed',
+        description: error.message || 'Failed to download manifest',
+        variant: 'destructive',
+      });
+    } finally {
+      setManifestDownloadLoading(false);
+    }
+  };
+
+  const handleManifestPrint = () => {
+    if (!currentManifestTrip?._id) return;
+    const printUrl = `/api/admin/manifests/${currentManifestTrip._id}/download?format=html&disposition=inline&printer=mobile&print=1`;
+    window.open(printUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleUpdateOnBoarded = async (bookingId: string, onBoarded: boolean) => {
@@ -1271,6 +1323,38 @@ export function TripsClient() {
             <DialogDescription>
               View and manage passengers for this trip
             </DialogDescription>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleManifestDownload('csv')}
+                disabled={manifestDownloadLoading || !currentManifestTrip?._id}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleManifestDownload('html')}
+                disabled={manifestDownloadLoading || !currentManifestTrip?._id}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Download HTML
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleManifestPrint}
+                disabled={!currentManifestTrip?._id}
+                className="gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                Print (Mobile)
+              </Button>
+            </div>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">

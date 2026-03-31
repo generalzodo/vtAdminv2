@@ -24,6 +24,7 @@ import { usePermissions as usePermissionsContext } from '@/contexts/permissions-
 import { useRole, useHasRole } from '@/hooks/use-role';
 import { useHasPermission } from '@/hooks/use-permissions';
 import { FileText, BarChart3 } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import { tenantConfig } from '@/lib/tenant-config';
 
 // All possible menu items with their required permissions/roles
@@ -35,12 +36,14 @@ const allMenuItems = [
   { title: 'CSO Dashboard', url: '/cso', icon: Calendar, role: 'cso' },
   { title: 'Routes', url: '/routes', icon: Route, permission: 'routes.view' },
   { title: 'Trips', url: '/trips', icon: Calendar, permission: 'trips.view' },
+  { title: 'Standby Buses', url: '/standby-pools', icon: Bus, permission: 'standby_pool.view' },
   { title: 'Withdrawals', url: '/withdrawals', icon: Wallet, permission: 'withdrawals.view' },
   { title: 'Reviews', url: '/reviews', icon: Star, permission: 'reviews.view' },
   { title: 'Buses', url: '/buses', icon: Bus, permission: 'buses.view' },
-  { title: 'Bus Types', url: '/bus-types', icon: Bus, permission: 'bus-types.view' },
+  // { title: 'Bus Types', url: '/bus-types', icon: Bus, permission: 'bus-types.view' },
   { title: 'Transport Officers', url: '/drivers', icon: UserCog, permission: 'drivers.view' },
   { title: 'Reports', url: '/reports', icon: BarChart3, permission: 'reports.view' },
+  { title: 'Financials', url: '/payments', icon: CreditCard, permissionAny: ['financials.view', 'reports.view'] },
   { title: 'Audit Logs', url: '/audit', icon: FileText, permission: 'audit.view' },
   { title: 'Settings', url: '/settings', icon: Settings, permission: 'settings.view' },
 ];
@@ -99,6 +102,10 @@ export function AdminSidebar({ mobile = false }: AdminSidebarProps) {
     }
     
     // Check permission-based items
+    if ((item as any).permissionAny) {
+      return (item as any).permissionAny.some((perm: string) => checkHasPermission(perm));
+    }
+
     if (item.permission) {
       return checkHasPermission(item.permission);
     }

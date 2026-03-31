@@ -5,7 +5,7 @@ import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, MoreHorizontal, Eye, Plus, Filter, CalendarIcon } from 'lucide-react';
+import { Download, MoreHorizontal, Eye, Plus, Filter, CalendarIcon, Ban } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -810,6 +810,41 @@ export function BookingsClient() {
     }
   };
 
+  const handleCancelBooking = async (booking: Booking) => {
+    const bookingLabel = booking.bookingId || booking._id;
+    const shouldCancel = window.confirm(
+      `Cancel booking ${bookingLabel}? This will mark the ticket as cancelled and free the seat.`
+    );
+
+    if (!shouldCancel) return;
+
+    try {
+      const response = await fetch(`/api/admin/bookings/${booking._id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Cancelled by admin from Bookings dropdown' }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Failed to cancel booking');
+      }
+
+      toast({
+        title: 'Ticket Cancelled',
+        description: data.message || 'Booking cancelled and seat released successfully.',
+      });
+
+      fetchBookings(page, limit);
+    } catch (error: any) {
+      toast({
+        title: 'Cancellation Failed',
+        description: error.message || 'Failed to cancel booking',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleUpdateOnBoarded = async (bookingId: string, onBoarded: boolean) => {
     try {
       const response = await fetch(`/api/admin/bookings/${bookingId}/onboarded`, {
@@ -862,6 +897,15 @@ export function BookingsClient() {
         {(row.paymentStatus === 'success' || row.paymentStatus === 'admin paid') && (
           <DropdownMenuItem onClick={() => handleDownloadTicket(row)}>
             Download Ticket
+          </DropdownMenuItem>
+        )}
+        {row.status !== 'cancelled' && row.status !== 'Cancelled' && (
+          <DropdownMenuItem
+            onClick={() => handleCancelBooking(row)}
+            className="text-red-600 focus:text-red-700"
+          >
+            <Ban className="mr-2 h-4 w-4" />
+            Cancel Booking
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => {

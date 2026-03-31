@@ -45,10 +45,14 @@ export function hasRole(roleName: AdminRole | AdminRole[]): boolean {
     return false;
   }
 
-  const userRole = context.permissions.role || null;
   const rolesToCheck = Array.isArray(roleName) ? roleName : [roleName];
+  const userRoles = [
+    ...(context.permissions.role ? [context.permissions.role] : []),
+    ...(context.permissions.roles || []),
+  ];
+  const uniqueUserRoles = [...new Set(userRoles)] as AdminRole[];
   
-  return userRole ? rolesToCheck.includes(userRole as AdminRole) : false;
+  return rolesToCheck.some((role) => uniqueUserRoles.includes(role));
 }
 
 /**

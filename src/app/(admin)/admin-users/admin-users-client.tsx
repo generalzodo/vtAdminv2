@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,11 @@ interface AdminUser {
     name: string;
     description: string;
   };
+  roles?: {
+    _id: string;
+    name: string;
+    description: string;
+  }[];
   status: string;
   createdAt: string;
 }
@@ -85,7 +91,7 @@ export function AdminUsersClient() {
     email: '',
     phone: '',
     password: '',
-    role: '',
+    roles: [] as string[],
     status: 'active',
   });
   const [passwordData, setPasswordData] = useState({
@@ -93,7 +99,7 @@ export function AdminUsersClient() {
     confirmPassword: '',
   });
   const [roleData, setRoleData] = useState({
-    role: '',
+    roles: [] as string[],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -163,6 +169,10 @@ export function AdminUsersClient() {
 
   const handleOpenDialog = (user?: AdminUser) => {
     if (user) {
+      const selectedRoles = user.roles?.length
+        ? user.roles.map((role) => role._id)
+        : (user.role?._id ? [user.role._id] : []);
+
       setEditingUser(user);
       setFormData({
         firstName: user.firstName || '',
@@ -170,7 +180,7 @@ export function AdminUsersClient() {
         email: user.email || '',
         phone: user.phone || '',
         password: '',
-        role: user.role?._id || '',
+        roles: selectedRoles,
         status: user.status || 'active',
       });
     } else {
@@ -181,7 +191,7 @@ export function AdminUsersClient() {
         email: '',
         phone: '',
         password: '',
-        role: '',
+        roles: [],
         status: 'active',
       });
     }
@@ -198,7 +208,7 @@ export function AdminUsersClient() {
       email: '',
       phone: '',
       password: '',
-      role: '',
+      roles: [],
       status: 'active',
     });
     setFormErrors({});
@@ -250,16 +260,13 @@ export function AdminUsersClient() {
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
+        roles: formData.roles,
         status: formData.status,
       };
 
       if (!editingUser) {
         body.password = formData.password;
       }
-      if (formData.role) {
-        body.role = formData.role;
-      }
-
       const response = await fetch(url, {
         method,
         headers: {
@@ -400,9 +407,9 @@ export function AdminUsersClient() {
     }
   };
 
-  const handleOpenRoleDialog = (userId: string, currentRoleId?: string) => {
+  const handleOpenRoleDialog = (userId: string, currentRoleIds?: string[]) => {
     setChangingRoleUserId(userId);
-    setRoleData({ role: currentRoleId || 'none' });
+    setRoleData({ roles: currentRoleIds || [] });
     setRoleDialogOpen(true);
   };
 
@@ -415,7 +422,7 @@ export function AdminUsersClient() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ role: roleData.role || null }),
+        body: JSON.stringify({ roles: roleData.roles }),
       });
 
       const data = await response.json();
@@ -427,8 +434,8 @@ export function AdminUsersClient() {
         });
         setRoleDialogOpen(false);
         setChangingRoleUserId(null);
-        setRoleData({ role: 'none' });
-        fetchUsers();
+        setRoleData({ roles: [] });
+        fetchUsers(page, limit);
       } else {
         toast({
           title: 'Error',
@@ -495,6 +502,37 @@ export function AdminUsersClient() {
     );
   };
 
+  const getUserRoles = (user: AdminUser) => {
+    if (user.roles && user.roles.length > 0) {
+      return user.roles;
+    }
+    return user.role ? [user.role] : [];
+  };
+
+  const toggleFormRole = (roleId: string) => {
+    setFormData((prev) => {
+      const alreadySelected = prev.roles.includes(roleId);
+      return {
+        ...prev,
+        roles: alreadySelected
+          ? prev.roles.filter((id) => id !== roleId)
+          : [...prev.roles, roleId],
+      };
+    });
+  };
+
+  const toggleDialogRole = (roleId: string) => {
+    setRoleData((prev) => {
+      const alreadySelected = prev.roles.includes(roleId);
+      return {
+        ...prev,
+        roles: alreadySelected
+          ? prev.roles.filter((id) => id !== roleId)
+          : [...prev.roles, roleId],
+      };
+    });
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -517,11 +555,23 @@ export function AdminUsersClient() {
     {
       key: 'role',
       header: 'Role',
-      cell: (row) => (
-        <Badge variant="outline">
-          {row.role?.name || 'No Role'}
-        </Badge>
-      ),
+      cell: (row) => {
+        const userRoles = getUserRoles(row);
+
+        if (userRoles.length === 0) {
+          return <Badge variant="outline">No Role</Badge>;
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {userRoles.map((role) => (
+              <Badge key={role._id} variant="outline">
+                {role.name}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -548,7 +598,7 @@ export function AdminUsersClient() {
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleOpenRoleDialog(row._id, row.role?._id)}>
+            <DropdownMenuItem onClick={() => handleOpenRoleDialog(row._id, getUserRoles(row).map((role) => role._id))}>
               <UserCog className="h-4 w-4 mr-2" />
               Change Role
             </DropdownMenuItem>
@@ -714,20 +764,21 @@ export function AdminUsersClient() {
               </div>
             )}
             <div>
-              <Label htmlFor="role">Role</Label>
-              <Select value={formData.role || undefined} onValueChange={(value) => handleChange('role', value === 'none' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Role</SelectItem>
-                  {roles.map((role) => (
-                    <SelectItem key={role._id} value={role._id}>
+              <Label>Roles</Label>
+              <div className="rounded-md border p-3 max-h-48 overflow-y-auto space-y-2">
+                {roles.map((role) => (
+                  <div key={role._id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`form-role-${role._id}`}
+                      checked={formData.roles.includes(role._id)}
+                      onCheckedChange={() => toggleFormRole(role._id)}
+                    />
+                    <Label htmlFor={`form-role-${role._id}`} className="font-normal cursor-pointer">
                       {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
@@ -801,20 +852,21 @@ export function AdminUsersClient() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="newRole">Role</Label>
-              <Select value={roleData.role === '' ? 'none' : (roleData.role || undefined)} onValueChange={(value) => setRoleData({ role: value === 'none' ? '' : value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Role</SelectItem>
-                  {roles.map((role) => (
-                    <SelectItem key={role._id} value={role._id}>
+              <Label>Roles</Label>
+              <div className="rounded-md border p-3 max-h-48 overflow-y-auto space-y-2">
+                {roles.map((role) => (
+                  <div key={role._id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`dialog-role-${role._id}`}
+                      checked={roleData.roles.includes(role._id)}
+                      onCheckedChange={() => toggleDialogRole(role._id)}
+                    />
+                    <Label htmlFor={`dialog-role-${role._id}`} className="font-normal cursor-pointer">
                       {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

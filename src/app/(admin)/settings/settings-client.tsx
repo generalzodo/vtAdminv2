@@ -8,7 +8,8 @@ import { PricesTab } from './tabs/prices-tab';
 import { TermsTab } from './tabs/terms-tab';
 import { CommissionTab } from './tabs/commission-tab';
 import { PopupTab } from './tabs/popup-tab';
-type TabType = 'locations' | 'prices' | 'terms' | 'commission' | 'popup';
+import { AutoAllocationTab } from './tabs/auto-allocation-tab';
+type TabType = 'locations' | 'prices' | 'terms' | 'commission' | 'popup' | 'autoAllocation';
 
 export function SettingsClient() {
   const [currentTab, setCurrentTab] = useState<TabType>('locations');
@@ -19,6 +20,7 @@ export function SettingsClient() {
     { id: 'terms' as TabType, label: 'Terms & Conditions', description: 'Manage Terms and Conditions' },
     { id: 'commission' as TabType, label: 'Agent Commission', description: 'Manage Bus Commission Rates' },
     { id: 'popup' as TabType, label: 'Popup Settings', description: 'Manage website popup' },
+    { id: 'autoAllocation' as TabType, label: 'Auto Allocation', description: 'Configure standby-triggered trip creation' },
   ];
 
   return (
@@ -59,6 +61,7 @@ export function SettingsClient() {
               {currentTab === 'terms' && <TermsTab />}
               {currentTab === 'commission' && <CommissionTab />}
               {currentTab === 'popup' && <PopupTab />}
+              {currentTab === 'autoAllocation' && <AutoAllocationTab />}
             </CardContent>
           </Card>
         </div>

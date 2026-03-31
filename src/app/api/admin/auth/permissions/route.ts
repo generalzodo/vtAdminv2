@@ -95,44 +95,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Debug logging
-    console.log('🔍 [PERMISSIONS API] User role data:', {
-      role: user.role,
-      roleName: user.role?.name,
-      roleId: user.role?._id,
-      roleType: typeof user.role,
-      roleString: JSON.stringify(user.role),
-    });
+    // Get roles and permissions
+    const roleCandidates = [
+      ...(user.role ? [user.role] : []),
+      ...(Array.isArray(user.roles) ? user.roles : []),
+    ];
 
-    // Get role and permissions
-    // Handle both populated role object and role ID
-    let roleName = null;
-    if (user.role) {
-      if (typeof user.role === 'object' && user.role.name) {
-        roleName = user.role.name;
-      } else if (typeof user.role === 'string') {
-        // Role is just an ID, we'd need to fetch it, but for now check if it exists
-        // This shouldn't happen if populate is working, but handle it
-        console.warn('⚠️ [PERMISSIONS API] Role is a string ID, not populated:', user.role);
-        roleName = null;
-      }
+    const roleById = new Map<string, any>();
+    for (const role of roleCandidates) {
+      if (!role || typeof role !== 'object') continue;
+      const roleId = role._id?.toString?.() || role.name;
+      if (!roleId || roleById.has(roleId)) continue;
+      roleById.set(roleId, role);
     }
 
-    const isSuperAdmin = roleName === 'super_admin';
+    const normalizedRoles = Array.from(roleById.values());
+    const roleNames = normalizedRoles
+      .map((role) => role?.name)
+      .filter((name): name is string => Boolean(name));
+
+    const primaryRoleName = user.role?.name || roleNames[0] || null;
+    const isSuperAdmin = roleNames.includes('super_admin');
+
     console.log('✅ [PERMISSIONS API] Role check:', {
-      roleName,
+      roleName: primaryRoleName,
+      roles: roleNames,
       isSuperAdmin,
-      checkResult: roleName === 'super_admin',
+      checkResult: isSuperAdmin,
     });
+
     const effectivePermissions = isSuperAdmin 
       ? ['*'] 
-      : [...(user.role?.permissions || []), ...(user.permissions || [])];
+      : [
+          ...normalizedRoles.flatMap((role) => role?.permissions || []),
+          ...(user.permissions || []),
+        ];
 
     const responseData = {
       success: true,
       data: {
         isSuperAdmin,
-        role: roleName,
+        role: primaryRoleName,
+        roles: [...new Set(roleNames)],
         effectivePermissions: [...new Set(effectivePermissions)]
       }
     };

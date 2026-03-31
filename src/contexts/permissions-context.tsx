@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 export interface UserPermissions {
   isSuperAdmin: boolean;
   role: string | null;
+  roles?: string[];
   effectivePermissions: string[];
 }
 
