@@ -25,13 +25,20 @@ export function LoginForm() {
   const [state, formAction] = useActionState(loginAction, { message: '', errors: null });
 
   useEffect(() => {
-    if (state.message) {
-      toast({
-        variant: state.message.includes('Access denied') ? 'destructive' : 'destructive',
-        title: state.message.includes('Access denied') ? 'Access Denied' : 'Error',
-        description: state.message,
-      });
-    }
+    const messageText =
+      typeof state.message === 'string'
+        ? state.message
+        : state.message != null
+          ? String(state.message)
+          : '';
+    if (!messageText) return;
+
+    const isAccessDenied = messageText.includes('Access denied');
+    toast({
+      variant: 'destructive',
+      title: isAccessDenied ? 'Access Denied' : 'Error',
+      description: messageText,
+    });
   }, [state.message, toast]);
 
   return (

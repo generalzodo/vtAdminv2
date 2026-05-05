@@ -10,6 +10,15 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+function normalizeApiError(error: unknown, fallback: string): string {
+  if (typeof error === 'string' && error.length > 0) return error;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const m = (error as { message: unknown }).message;
+    if (typeof m === 'string') return m;
+  }
+  return fallback;
+}
+
 export async function loginAction(prevState: any, formData: FormData) {
     const validatedFields = loginSchema.safeParse(Object.fromEntries(formData.entries()));
 
@@ -83,10 +92,13 @@ export async function loginAction(prevState: any, formData: FormData) {
         }
 
         if (!response.ok || !result.token) {
-             return {
-                message: result.error || 'Login failed. Please check your credentials.',
-                errors: null,
-            };
+          return {
+            message: normalizeApiError(
+              result.error,
+              'Login failed. Please check your credentials.',
+            ),
+            errors: null,
+          };
         }
 
         // Check if user is admin

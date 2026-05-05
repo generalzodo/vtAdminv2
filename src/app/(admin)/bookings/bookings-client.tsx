@@ -57,6 +57,7 @@ interface Booking {
   paystack_ref?: string;
   paystack_reference?: string;
   flutterwave_ref?: string;
+  monnify_ref?: string;
   isRescheduled?: boolean;
   onBoarded?: boolean;
   createdAt: string;
@@ -621,7 +622,7 @@ export function BookingsClient() {
       key: 'paymentRef', 
       header: 'Payment ref',
       cell: (row) => {
-        const ref = row.paystack_ref || row.paystack_reference || row.flutterwave_ref || '';
+        const ref = row.paystack_ref || row.paystack_reference || row.flutterwave_ref || row.monnify_ref || '';
         return `${row.mode || 'Paystack'}: ${row.paymentStatus} ${ref}`;
       }
     },
@@ -1546,7 +1547,7 @@ export function BookingsClient() {
                 <div>
                   <Label className="text-sm font-semibold">Payment Reference</Label>
                   <p className="text-sm">
-                    {viewingBooking.paystack_ref || viewingBooking.paystack_reference || viewingBooking.flutterwave_ref || 'N/A'}
+                    {viewingBooking.paystack_ref || viewingBooking.paystack_reference || viewingBooking.flutterwave_ref || viewingBooking.monnify_ref || 'N/A'}
                   </p>
                 </div>
                 <div>
@@ -1598,7 +1599,7 @@ export function BookingsClient() {
               <div className="space-y-2">
                 <Label>Payment Reference</Label>
                 <p className="text-sm">
-                  {verifyingBooking.paystack_ref || verifyingBooking.paystack_reference || verifyingBooking.flutterwave_ref || 'N/A'}
+                  {verifyingBooking.paystack_ref || verifyingBooking.paystack_reference || verifyingBooking.flutterwave_ref || verifyingBooking.monnify_ref || 'N/A'}
                 </p>
               </div>
               <div className="space-y-2">

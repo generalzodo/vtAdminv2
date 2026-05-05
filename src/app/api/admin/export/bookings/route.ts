@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         'Total Amount': (booking.tripAmount || 0) + (booking.returnAmount || 0),
         'Discounted Fare': booking.discountedFare || 0,
         'Payment Mode': booking.mode || 'Paystack',
-        'Payment Ref': booking.paystack_ref || booking.paystack_reference || booking.flutterwave_ref || '',
+        'Payment Ref': booking.paystack_ref || booking.paystack_reference || booking.flutterwave_ref || booking.monnify_ref || booking.quickteller_ref || '',
         'Rescheduled': booking.isRescheduled ? 'Yes' : 'No',
         'On Boarded': booking.onBoarded ? 'Yes' : 'No',
         'Emergency First Name': booking.emergencyFirstName || '',

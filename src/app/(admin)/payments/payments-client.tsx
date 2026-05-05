@@ -55,7 +55,24 @@ interface Summary {
 	totalReschedulingFareDiff: number;
 	totalReschedulingAmount: number;
 	totalReschedulingCount: number;
+	totalManifestAmount?: number;
+	totalManifestCount?: number;
 	grandTotal: number;
+}
+
+interface ManifestPaymentRecord {
+	_id: string;
+	tripDate?: string;
+	lineKind: string;
+	passengerLabel?: string;
+	kgs?: number;
+	amount: number;
+	mode: string;
+	paymentMethod?: string;
+	recordedAt?: string;
+	routeTitle?: string;
+	vehicleNo?: string;
+	tripTime?: string;
 }
 
 interface FinancialsData {
@@ -65,6 +82,7 @@ interface FinancialsData {
 	summary: Summary;
 	bookings: BookingRecord[];
 	rescheduledBookings: RescheduledRecord[];
+	manifestPayments?: ManifestPaymentRecord[];
 }
 
 const MONTHS = [
@@ -87,6 +105,7 @@ const PAYMENT_TYPES = [
 	{ value: 'paystack', label: 'Paystack' },
 	{ value: 'quickteller', label: 'Quickteller' },
 	{ value: 'flutterwave', label: 'Flutterwave' },
+	{ value: 'monnify', label: 'Monnify' },
 	{ value: 'wallet', label: 'Wallet' },
 	{ value: 'admin', label: 'Admin' },
 ];
@@ -104,6 +123,7 @@ const RECORD_TYPES = [
 	{ value: 'all', label: 'All Records' },
 	{ value: 'bookings', label: 'Bookings Only' },
 	{ value: 'rescheduled', label: 'Rescheduling Only' },
+	{ value: 'manifest', label: 'Manifest (luggage & waybills)' },
 ];
 
 function formatCurrency(amount: number) {
@@ -237,6 +257,7 @@ export function FinancialsClient() {
 	const pct = parseFloat(percentage) || 0;
 	const bookingCalc = data ? (data.summary.totalBookingAmount * pct) / 100 : 0;
 	const reschedulingCalc = data ? (data.summary.totalReschedulingAmount * pct) / 100 : 0;
+	const manifestCalc = data ? ((data.summary.totalManifestAmount ?? 0) * pct) / 100 : 0;
 	const grandTotalCalc = data ? (data.summary.grandTotal * pct) / 100 : 0;
 
 	return (
@@ -373,7 +394,7 @@ export function FinancialsClient() {
 
 			{data && !loading && (
 				<>
-					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 						<Card>
 							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 								<CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
@@ -400,6 +421,17 @@ export function FinancialsClient() {
 
 						<Card>
 							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+								<CardTitle className="text-sm font-medium">Manifest (luggage &amp; waybills)</CardTitle>
+								<DollarSign className="h-4 w-4 text-muted-foreground" />
+							</CardHeader>
+							<CardContent>
+								<div className="text-2xl font-bold">{formatCurrency(data.summary.totalManifestAmount ?? 0)}</div>
+								<p className="text-xs text-muted-foreground">{data.summary.totalManifestCount ?? 0} cash/transfer lines</p>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 								<CardTitle className="text-sm font-medium">Grand Total</CardTitle>
 								<Calendar className="h-4 w-4 text-muted-foreground" />
 							</CardHeader>
@@ -419,7 +451,7 @@ export function FinancialsClient() {
 							<CardContent>
 								<div className="text-2xl font-bold text-primary">{formatCurrency(grandTotalCalc)}</div>
 								<p className="text-xs text-muted-foreground">
-									Bookings: {formatCurrency(bookingCalc)} · Resch: {formatCurrency(reschedulingCalc)}
+									Bookings: {formatCurrency(bookingCalc)} · Resch: {formatCurrency(reschedulingCalc)} · Manifest: {formatCurrency(manifestCalc)}
 								</p>
 							</CardContent>
 						</Card>
@@ -434,6 +466,9 @@ export function FinancialsClient() {
 								<TabsList>
 									<TabsTrigger value="bookings">Bookings ({data.summary.totalBookingCount})</TabsTrigger>
 									<TabsTrigger value="rescheduling">Rescheduling ({data.summary.totalReschedulingCount})</TabsTrigger>
+									<TabsTrigger value="manifest">
+										Manifest ({data.summary.totalManifestCount ?? (data.manifestPayments?.length ?? 0)})
+									</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="bookings">
@@ -467,6 +502,51 @@ export function FinancialsClient() {
 															<TableCell className="text-right font-medium">{formatCurrency(b.amount)}</TableCell>
 															<TableCell className="text-right text-muted-foreground">{pct ? formatCurrency((b.amount * pct) / 100) : '—'}</TableCell>
 															<TableCell className="text-xs">{formatDate(b.createdAt)}</TableCell>
+														</TableRow>
+													))
+												)}
+											</TableBody>
+										</Table>
+									</div>
+								</TabsContent>
+
+								<TabsContent value="manifest">
+									<div className="rounded-md border overflow-auto max-h-[500px]">
+										<Table>
+											<TableHeader>
+												<TableRow>
+													<TableHead>Trip date</TableHead>
+													<TableHead>Route</TableHead>
+													<TableHead>Kind</TableHead>
+													<TableHead>Passenger / label</TableHead>
+													<TableHead className="text-right">Kg</TableHead>
+													<TableHead>Pay</TableHead>
+													<TableHead className="text-right">Amount</TableHead>
+													<TableHead className="text-right">{pct ? `${pct}%` : '%'}</TableHead>
+													<TableHead>Recorded</TableHead>
+												</TableRow>
+											</TableHeader>
+											<TableBody>
+												{(data.manifestPayments ?? []).length === 0 ? (
+													<TableRow>
+														<TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+															No manifest luggage or waybill payments for filters (use Payment Type “All” to include manifest lines).
+														</TableCell>
+													</TableRow>
+												) : (
+													(data.manifestPayments ?? []).map((m) => (
+														<TableRow key={m._id}>
+															<TableCell className="text-xs whitespace-nowrap">{m.tripDate || '—'}</TableCell>
+															<TableCell className="text-xs max-w-[160px] truncate">{m.routeTitle || '—'}</TableCell>
+															<TableCell className="text-xs">{m.lineKind}</TableCell>
+															<TableCell className="text-xs">{m.passengerLabel}</TableCell>
+															<TableCell className="text-right">{m.kgs ?? '—'}</TableCell>
+															<TableCell className="text-xs">{m.paymentMethod}</TableCell>
+															<TableCell className="text-right font-medium">{formatCurrency(m.amount)}</TableCell>
+															<TableCell className="text-right text-muted-foreground">
+																{pct ? formatCurrency((m.amount * pct) / 100) : '—'}
+															</TableCell>
+															<TableCell className="text-xs">{formatDate(m.recordedAt || '')}</TableCell>
 														</TableRow>
 													))
 												)}

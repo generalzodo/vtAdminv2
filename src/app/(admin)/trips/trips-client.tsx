@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import html2canvas from 'html2canvas';
 import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus, MoreHorizontal, Edit, Trash2, CalendarIcon, Users, MapPin, Clock, Bus, UserCheck, Printer, FileText } from 'lucide-react';
+import { Download, Plus, MoreHorizontal, Edit, Trash2, CalendarIcon, Users, MapPin, Clock, Bus, UserCheck, Printer, FileText, ImageIcon, UserMinus } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -75,10 +76,26 @@ interface Trip {
   isWalkIn?: boolean;
   walkInTimeSlot?: string;
   busNo?: string;
+  /** Counter maintained by booking create/cancel (not `trip.seats`). */
   availableSeats?: number;
+  /** Reschedule holds — subtract non-expired entries for “bookable now”, same as booking.controller */
+  heldSeats?: { expiresAt: string | Date }[];
   seats?: string[];
   status: string;
   createdAt: string;
+}
+
+/** Effective seats left using booking-maintained `availableSeats` minus active reschedule holds. */
+function getBookableSeatCount(trip: Trip): number | null {
+  const raw = trip.availableSeats;
+  if (raw == null || (typeof raw === 'string' && raw === '')) return null;
+  const base = Number(raw);
+  if (Number.isNaN(base)) return null;
+  const now = Date.now();
+  const activeHolds = (trip.heldSeats ?? []).filter(
+    (h) => h?.expiresAt != null && new Date(h.expiresAt).getTime() > now
+  ).length;
+  return Math.max(0, base - activeHolds);
 }
 
 export function TripsClient() {
@@ -127,6 +144,47 @@ export function TripsClient() {
   const [onboardingAll, setOnboardingAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [manifestDownloadLoading, setManifestDownloadLoading] = useState(false);
+  const [luggagePricePerKg, setLuggagePricePerKg] = useState(120);
+  const [manifestExcludedBookingIds, setManifestExcludedBookingIds] = useState<string[]>([]);
+  const [excludedBookingsPreview, setExcludedBookingsPreview] = useState<
+    { _id: string; bookingId?: string; firstName?: string; lastName?: string; phone?: string }[]
+  >([]);
+  const [manifestExtraPassengers, setManifestExtraPassengers] = useState<
+    { localId: string; firstName: string; lastName: string; phone: string; from: string; to: string; seat: string; onBoarded: boolean }[]
+  >([]);
+  const [manifestLuggage, setManifestLuggage] = useState<
+    {
+      targetType: 'booking' | 'extra';
+      bookingId?: string;
+      extraPassengerLocalId?: string;
+      kgs: number;
+      paymentMethod: '' | 'cash' | 'transfer';
+    }[]
+  >([]);
+  const [manifestWaybills, setManifestWaybills] = useState<
+    { localId: string; label: string; kgs: number; paymentMethod: '' | 'cash' | 'transfer' }[]
+  >([]);
+  const [manifestStats, setManifestStats] = useState<{
+    totalManifestRows?: number;
+    totalOnboarded?: number;
+    totalLuggageKgs?: number;
+    totalLuggageAmount?: number;
+    totalWaybillKgs?: number;
+    totalWaybillAmount?: number;
+    totalBookingFare?: number;
+    grandTotalFare?: number;
+  } | null>(null);
+  const [manifestSaving, setManifestSaving] = useState(false);
+  const [addPassengerOpen, setAddPassengerOpen] = useState(false);
+  const [newExtraForm, setNewExtraForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    from: '',
+    to: '',
+    seat: '',
+  });
+  const manifestExportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
   // Manifest permissions
@@ -574,7 +632,45 @@ export function TripsClient() {
           ...tripData,
           title: originalTrip?.title || tripData.title,
         });
-        setManifestBookings(data.bookings || tripData.bookings || []);
+        if (typeof data.luggagePricePerKg === 'number') {
+          setLuggagePricePerKg(data.luggagePricePerKg);
+        }
+        setManifestExcludedBookingIds(data.manifestExcludedBookingIds || []);
+        setExcludedBookingsPreview(data.excludedBookingsPreview || []);
+        setManifestExtraPassengers(
+          (data.manifestExtraPassengers || []).map((e: any) => ({
+            localId: e.localId,
+            firstName: e.firstName || '',
+            lastName: e.lastName || '',
+            phone: e.phone || '',
+            from: e.from || '',
+            to: e.to || '',
+            seat: e.seat || '',
+            onBoarded: Boolean(e.onBoarded),
+          }))
+        );
+        setManifestLuggage(
+          (data.manifestLuggage || []).map((l: any) => ({
+            targetType: l.targetType === 'extra' ? 'extra' : 'booking',
+            bookingId: l.bookingId ? String(l.bookingId) : undefined,
+            extraPassengerLocalId: l.extraPassengerLocalId || '',
+            kgs: Number(l.kgs) || 0,
+            paymentMethod: l.paymentMethod === 'transfer' ? 'transfer' : l.paymentMethod === 'cash' ? 'cash' : '',
+          }))
+        );
+        setManifestWaybills(
+          (data.manifestWaybills || []).map((w: any) => ({
+            localId: w.localId,
+            label: w.label || '',
+            kgs: Number(w.kgs) || 0,
+            paymentMethod: w.paymentMethod === 'transfer' ? 'transfer' : w.paymentMethod === 'cash' ? 'cash' : '',
+          }))
+        );
+        if (data.stats) {
+          setManifestStats(data.stats);
+        }
+        const rows = data.passengerManifest || data.bookings || tripData.bookings || [];
+        setManifestBookings(rows);
         
         // Find matching driver if transportOfficerName exists
         let selectedDriverId = '';
@@ -605,49 +701,207 @@ export function TripsClient() {
     }
   };
 
-  const handleUpdateManifest = async () => {
-    if (!currentManifestTrip?._id) return;
-
-    try {
-      // Get transport officer name from selected driver
-      let transportOfficerName = '';
-      if (manifestFormData.selectedDriverId && drivers.length > 0) {
-        const selectedDriver = drivers.find((d) => d._id === manifestFormData.selectedDriverId);
-        if (selectedDriver) {
-          transportOfficerName = `${selectedDriver.firstName} ${selectedDriver.lastName}`.trim();
-        }
+  const buildManifestTransportPayload = () => {
+    let transportOfficerName = '';
+    if (manifestFormData.selectedDriverId && drivers.length > 0) {
+      const selectedDriver = drivers.find((d) => d._id === manifestFormData.selectedDriverId);
+      if (selectedDriver) {
+        transportOfficerName = `${selectedDriver.firstName} ${selectedDriver.lastName}`.trim();
       }
+    }
+    return {
+      transportOfficerName,
+      vehicleNo: manifestFormData.vehicleNo,
+      manifestExcludedBookingIds,
+      manifestExtraPassengers,
+      manifestLuggage,
+      manifestWaybills,
+    };
+  };
 
+  const handleSaveManifest = async () => {
+    if (!currentManifestTrip?._id) return;
+    setManifestSaving(true);
+    try {
       const response = await fetch(`/api/admin/manifests/${currentManifestTrip._id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transportOfficerName,
-          vehicleNo: manifestFormData.vehicleNo,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildManifestTransportPayload()),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update manifest');
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save manifest');
       }
 
-      toast({
-        title: 'Success',
-        description: 'Manifest updated successfully',
-      });
-
-      // Refresh manifest data
+      toast({ title: 'Saved', description: 'Manifest data saved (luggage, waybills, exclusions).' });
       await fetchTripManifest(currentManifestTrip._id);
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update manifest',
+        description: error.message || 'Failed to save manifest',
         variant: 'destructive',
       });
+    } finally {
+      setManifestSaving(false);
     }
   };
+
+  const patchManifestPartial = async (body: Record<string, unknown>) => {
+    if (!currentManifestTrip?._id) return;
+    const response = await fetch(`/api/admin/manifests/${currentManifestTrip._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Manifest update failed');
+    }
+    await fetchTripManifest(currentManifestTrip._id);
+  };
+
+  const handleRemoveBookingFromManifest = async (bookingMongoId: string) => {
+    if (!currentManifestTrip?._id) return;
+    if (!confirm('Remove this passenger from the manifest view only? Booking records are unchanged.')) return;
+    try {
+      const next = [...new Set([...manifestExcludedBookingIds, bookingMongoId])];
+      await patchManifestPartial({ manifestExcludedBookingIds: next });
+      toast({ title: 'Removed from manifest', description: 'Passenger can be restored from the excluded list.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleRestoreExcludedBooking = async (bookingMongoId: string) => {
+    try {
+      const next = manifestExcludedBookingIds.filter((id) => id !== bookingMongoId);
+      await patchManifestPartial({ manifestExcludedBookingIds: next });
+      toast({ title: 'Restored', description: 'Passenger is back on the manifest.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleRemoveExtraPassenger = async (localId: string) => {
+    if (!confirm('Remove this manifest-only passenger from the list?')) return;
+    try {
+      const nextExtras = manifestExtraPassengers.filter((e) => e.localId !== localId);
+      const lugNext = manifestLuggage.filter(
+        (l) => !(l.targetType === 'extra' && l.extraPassengerLocalId === localId)
+      );
+      setManifestLuggage(lugNext);
+      await patchManifestPartial({ manifestExtraPassengers: nextExtras, manifestLuggage: lugNext });
+      toast({ title: 'Removed', description: 'Manifest-only passenger removed.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleAddManifestPassenger = async () => {
+    if (!newExtraForm.firstName.trim() || !newExtraForm.lastName.trim()) {
+      toast({
+        title: 'Validation',
+        description: 'First and last name are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const localId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `mp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const next = [
+      ...manifestExtraPassengers,
+      {
+        localId,
+        firstName: newExtraForm.firstName.trim(),
+        lastName: newExtraForm.lastName.trim(),
+        phone: newExtraForm.phone.trim(),
+        from: newExtraForm.from.trim(),
+        to: newExtraForm.to.trim(),
+        seat: newExtraForm.seat.trim(),
+        onBoarded: false,
+      },
+    ];
+    try {
+      await patchManifestPartial({ manifestExtraPassengers: next });
+      setAddPassengerOpen(false);
+      setNewExtraForm({ firstName: '', lastName: '', phone: '', from: '', to: '', seat: '' });
+      toast({ title: 'Added', description: 'Manifest-only passenger added.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const updateLuggageForPassenger = (
+    row: any,
+    patch: { kgs?: number; paymentMethod?: '' | 'cash' | 'transfer' }
+  ) => {
+    const targetType = row.rowKind === 'extra' ? 'extra' : 'booking';
+    const keyBooking = row.rowKind === 'booking' ? String(row._id) : '';
+    const keyExtra = row.rowKind === 'extra' ? row.localId : '';
+
+    const others = manifestLuggage.filter((l) => {
+      if (targetType === 'booking') {
+        return !(l.targetType === 'booking' && l.bookingId === keyBooking);
+      }
+      return !(l.targetType === 'extra' && l.extraPassengerLocalId === keyExtra);
+    });
+
+    const prev = manifestLuggage.find((l) =>
+      targetType === 'booking'
+        ? l.targetType === 'booking' && l.bookingId === keyBooking
+        : l.targetType === 'extra' && l.extraPassengerLocalId === keyExtra
+    );
+
+    const kgs = patch.kgs !== undefined ? patch.kgs : prev?.kgs ?? 0;
+    const paymentMethod =
+      patch.paymentMethod !== undefined ? patch.paymentMethod : prev?.paymentMethod ?? '';
+
+    const entry = {
+      targetType: targetType as 'booking' | 'extra',
+      bookingId: targetType === 'booking' ? keyBooking : undefined,
+      extraPassengerLocalId: targetType === 'extra' ? keyExtra : '',
+      kgs: Math.max(0, Number(kgs) || 0),
+      paymentMethod: (paymentMethod || '') as '' | 'cash' | 'transfer',
+    };
+
+    setManifestLuggage([...others, entry]);
+  };
+
+  const manifestTotalsLocal = useMemo(() => {
+    const fareSum = manifestBookings.reduce((acc: number, row: any) => {
+      if (row.rowKind === 'extra') return acc;
+      return acc + (Number(row.amount) || 0);
+    }, 0);
+    let luggageAmt = 0;
+    let luggageKgs = 0;
+    for (const l of manifestLuggage) {
+      const k = Number(l.kgs) || 0;
+      if (k <= 0) continue;
+      luggageKgs += k;
+      luggageAmt += Math.round(k * luggagePricePerKg);
+    }
+    let waybillAmt = 0;
+    let waybillKgs = 0;
+    for (const w of manifestWaybills) {
+      const k = Number(w.kgs) || 0;
+      if (k <= 0) continue;
+      waybillKgs += k;
+      waybillAmt += Math.round(k * luggagePricePerKg);
+    }
+    const onboard = manifestBookings.filter((r: any) => r.onBoarded).length;
+    return {
+      fareSum,
+      luggageAmt,
+      luggageKgs,
+      waybillAmt,
+      waybillKgs,
+      grand: fareSum + luggageAmt + waybillAmt,
+      onboard,
+    };
+  }, [manifestBookings, manifestLuggage, manifestWaybills, luggagePricePerKg]);
 
   const triggerFileDownload = (blob: Blob, fileName: string) => {
     const url = window.URL.createObjectURL(blob);
@@ -700,7 +954,28 @@ export function TripsClient() {
     window.open(printUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const handleUpdateOnBoarded = async (bookingId: string, onBoarded: boolean) => {
+  const handleUpdateOnBoarded = async (row: any, onBoarded: boolean) => {
+    if (row.rowKind === 'extra' && row.localId) {
+      try {
+        const next = manifestExtraPassengers.map((e) =>
+          e.localId === row.localId ? { ...e, onBoarded } : e
+        );
+        await patchManifestPartial({ manifestExtraPassengers: next });
+        toast({
+          title: 'Success',
+          description: `Passenger ${onBoarded ? 'marked as on-boarded' : 'marked as not on-boarded'}`,
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to update onboard status',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    const bookingId = row._id;
     try {
       const response = await fetch(`/api/admin/bookings/${bookingId}/onboarded`, {
         method: 'PATCH',
@@ -714,9 +989,8 @@ export function TripsClient() {
         throw new Error('Failed to update onboard status');
       }
 
-      // Update local state
-      setManifestBookings(prev =>
-        prev.map(booking =>
+      setManifestBookings((prev) =>
+        prev.map((booking) =>
           booking._id === bookingId ? { ...booking, onBoarded } : booking
         )
       );
@@ -735,7 +1009,7 @@ export function TripsClient() {
   };
 
   const handleOnboardAll = async () => {
-    if (!currentManifestTrip?.bookings || manifestBookings.length === 0) {
+    if (manifestBookings.length === 0) {
       toast({
         title: 'No Passengers',
         description: 'No passengers found for this trip',
@@ -744,10 +1018,12 @@ export function TripsClient() {
       return;
     }
 
-    // Filter out passengers that are already onboarded
-    const passengersToOnboard = manifestBookings.filter((booking) => !booking.onBoarded);
-    
-    if (passengersToOnboard.length === 0) {
+    const bookingRows = manifestBookings.filter(
+      (b: any) => b.rowKind !== 'extra' && !b.onBoarded
+    );
+    const extraRows = manifestBookings.filter((b: any) => b.rowKind === 'extra' && !b.onBoarded);
+
+    if (bookingRows.length === 0 && extraRows.length === 0) {
       toast({
         title: 'Already Onboarded',
         description: 'All passengers are already onboarded',
@@ -760,46 +1036,48 @@ export function TripsClient() {
     let errorCount = 0;
 
     try {
-      // Process all passengers
-      const updatePromises = passengersToOnboard.map(async (booking) => {
+      const bookingPromises = bookingRows.map(async (booking: any) => {
         try {
           const response = await fetch(`/api/admin/bookings/${booking._id}/onboarded`, {
             method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ onBoarded: true }),
           });
-
           if (response.ok) {
             successCount++;
-            return { success: true };
-          } else {
-            errorCount++;
-            return { success: false };
+            return true;
           }
-        } catch (error) {
           errorCount++;
-          return { success: false };
+          return false;
+        } catch {
+          errorCount++;
+          return false;
         }
       });
 
-      await Promise.all(updatePromises);
+      await Promise.all(bookingPromises);
 
-      // Refresh manifest to ensure UI is up to date
-      if (currentManifestTrip?._id) {
+      if (extraRows.length > 0) {
+        try {
+          const nextExtras = manifestExtraPassengers.map((e) => ({ ...e, onBoarded: true }));
+          await patchManifestPartial({ manifestExtraPassengers: nextExtras });
+          successCount += extraRows.length;
+        } catch {
+          errorCount += extraRows.length;
+        }
+      } else if (currentManifestTrip?._id) {
         await fetchTripManifest(currentManifestTrip._id);
       }
 
       if (errorCount === 0) {
         toast({
           title: 'Success',
-          description: `Successfully onboarded all ${successCount} passenger(s)`,
+          description: `Successfully onboarded ${successCount} passenger(s)`,
         });
       } else if (successCount > 0) {
         toast({
           title: 'Partial Success',
-          description: `Onboarded ${successCount} passenger(s), ${errorCount} failed`,
+          description: `Onboarded ${successCount}, ${errorCount} failed`,
           variant: 'destructive',
         });
       } else {
@@ -809,7 +1087,7 @@ export function TripsClient() {
           variant: 'destructive',
         });
       }
-    } catch (error: any) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to onboard passengers. Please try again.',
@@ -817,6 +1095,31 @@ export function TripsClient() {
       });
     } finally {
       setOnboardingAll(false);
+    }
+  };
+
+  const handleExportManifestImage = async (mime: 'image/png' | 'image/jpeg') => {
+    if (!manifestExportRef.current || !currentManifestTrip?._id) return;
+    try {
+      const canvas = await html2canvas(manifestExportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const url = canvas.toDataURL(mime, mime === 'image/jpeg' ? 0.92 : undefined);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `manifest_${currentManifestTrip._id}.${mime === 'image/jpeg' ? 'jpg' : 'png'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast({ title: 'Downloaded', description: 'Manifest image export ready.' });
+    } catch (error: any) {
+      toast({
+        title: 'Export failed',
+        description: error?.message || 'Could not create image',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -898,12 +1201,8 @@ export function TripsClient() {
       key: 'availableSeats', 
       header: 'Available Seats',
       cell: (row) => {
-        if (row.isWalkIn) {
-          return row.availableSeats || 0;
-        }
-        const totalSeats = row.route?.bus?.seats || 0;
-        const bookedSeats = row.seats?.length || 0;
-        return totalSeats - bookedSeats;
+        const n = getBookableSeatCount(row);
+        return n == null ? '—' : n;
       }
     },
     { 
@@ -1354,10 +1653,32 @@ export function TripsClient() {
                 <Printer className="h-4 w-4" />
                 Print (Mobile)
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => handleExportManifestImage('image/png')}
+                disabled={!currentManifestTrip?._id}
+                className="gap-2"
+              >
+                <ImageIcon className="h-4 w-4" />
+                PNG
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => handleExportManifestImage('image/jpeg')}
+                disabled={!currentManifestTrip?._id}
+                className="gap-2"
+              >
+                <ImageIcon className="h-4 w-4" />
+                JPG
+              </Button>
             </div>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          <div ref={manifestExportRef} className="flex-1 overflow-y-auto space-y-4 pr-2 bg-background">
             {/* Trip Information Card */}
             <Card>
               <CardHeader>
@@ -1413,7 +1734,7 @@ export function TripsClient() {
                       <Users className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Passengers</p>
+                      <p className="text-sm text-muted-foreground">Listed passengers</p>
                       <p className="font-semibold text-lg">{manifestBookings.length}</p>
                     </div>
                   </div>
@@ -1424,8 +1745,14 @@ export function TripsClient() {
                     <div>
                       <p className="text-sm text-muted-foreground">Onboarded</p>
                       <p className="font-semibold text-lg text-green-600">
-                        {manifestBookings.filter(b => b.onBoarded).length} / {manifestBookings.length}
+                        {manifestTotalsLocal.onboard} / {manifestBookings.length}
                       </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 md:col-span-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Luggage rate</p>
+                      <p className="font-semibold">₦{luggagePricePerKg.toLocaleString()} / kg</p>
                     </div>
                   </div>
                 </div>
@@ -1436,7 +1763,7 @@ export function TripsClient() {
             <Card>
               <CardHeader>
                 <CardTitle>Manifest Details</CardTitle>
-                <CardDescription>Update transport officer and vehicle information</CardDescription>
+                <CardDescription>Transport officer, vehicle, luggage, waybills — save to persist.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1445,6 +1772,7 @@ export function TripsClient() {
                     <Select
                       value={manifestFormData.selectedDriverId}
                       onValueChange={(value) => setManifestFormData({ ...manifestFormData, selectedDriverId: value })}
+                      disabled={currentManifestTrip?.isLocked}
                     >
                       <SelectTrigger id="transportOfficer">
                         <SelectValue placeholder="Select Transport Officer" />
@@ -1465,11 +1793,16 @@ export function TripsClient() {
                       value={manifestFormData.vehicleNo}
                       onChange={(e) => setManifestFormData({ ...manifestFormData, vehicleNo: e.target.value })}
                       placeholder="Enter vehicle number"
+                      disabled={currentManifestTrip?.isLocked}
                     />
                   </div>
                 </div>
-                <Button onClick={handleUpdateManifest} className="mt-4 w-full md:w-auto">
-                  Update Manifest Info
+                <Button
+                  onClick={handleSaveManifest}
+                  className="mt-4 w-full md:w-auto"
+                  disabled={manifestSaving || currentManifestTrip?.isLocked}
+                >
+                  {manifestSaving ? 'Saving…' : 'Save manifest'}
                 </Button>
               </CardContent>
             </Card>
@@ -1477,96 +1810,350 @@ export function TripsClient() {
             {/* Passengers Table Card */}
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap justify-between items-center gap-2">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       Passengers ({manifestBookings.length})
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      Manage passenger onboard status
+                      Onboard status, luggage (kg × ₦{luggagePricePerKg}/kg). Save manifest to persist luggage &amp; waybills.
                     </CardDescription>
                   </div>
-                  {manifestBookings.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                      onClick={handleOnboardAll}
-                      disabled={onboardingAll}
-                      variant="default"
-                      className="gap-2"
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddPassengerOpen(true)}
+                      disabled={currentManifestTrip?.isLocked}
                     >
-                      <UserCheck className="h-4 w-4" />
-                      {onboardingAll ? 'Onboarding...' : 'Onboard All'}
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add passenger (manifest only)
                     </Button>
-                  )}
+                    {manifestBookings.length > 0 && (
+                      <Button
+                        onClick={handleOnboardAll}
+                        disabled={onboardingAll || currentManifestTrip?.isLocked}
+                        variant="default"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        {onboardingAll ? 'Onboarding...' : 'Onboard All'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 {manifestBookings.length === 0 ? (
                   <div className="text-center py-12">
                     <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">No passengers found for this trip.</p>
+                    <p className="text-muted-foreground">No passengers on this manifest. Add a manifest-only passenger or restore excluded bookings.</p>
                   </div>
                 ) : (
-                  <div className="rounded-md border">
+                  <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[120px]">Booking ID</TableHead>
-                          <TableHead>Passenger Name</TableHead>
-                          <TableHead className="w-[130px]">Phone</TableHead>
-                          <TableHead className="w-[150px]">Destination</TableHead>
-                          <TableHead className="w-[100px]">Seat No.</TableHead>
-                          <TableHead className="w-[180px]">Emergency Contact</TableHead>
-                          <TableHead className="w-[120px] text-center">On-Boarded</TableHead>
+                          <TableHead className="min-w-[100px]">Booking ID</TableHead>
+                          <TableHead className="min-w-[140px]">Passenger</TableHead>
+                          <TableHead className="min-w-[100px]">Phone</TableHead>
+                          <TableHead className="min-w-[100px]">To</TableHead>
+                          <TableHead className="min-w-[80px]">Seat</TableHead>
+                          <TableHead className="min-w-[120px]">Fare</TableHead>
+                          <TableHead className="min-w-[70px]">Luggage kg</TableHead>
+                          <TableHead className="min-w-[110px]">Payment</TableHead>
+                          <TableHead className="min-w-[90px]">Luggage ₦</TableHead>
+                          <TableHead className="text-center min-w-[90px]">Onboard</TableHead>
+                          <TableHead className="min-w-[80px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {manifestBookings.map((booking) => (
-                          <TableRow key={booking._id}>
-                            <TableCell className="font-medium">{booking.bookingId}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">
-                                {booking.firstName} {booking.middleName || ''} {booking.lastName}
-                              </div>
-                            </TableCell>
-                            <TableCell>{booking.phone}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{booking.to || 'N/A'}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                {booking.tripSeat && (
-                                  <Badge variant="secondary">{booking.tripSeat}</Badge>
+                        {manifestBookings.map((row: any) => {
+                          const lugEntry = manifestLuggage.find((l) =>
+                            row.rowKind === 'extra'
+                              ? l.targetType === 'extra' && l.extraPassengerLocalId === row.localId
+                              : l.targetType === 'booking' && l.bookingId === String(row._id)
+                          );
+                          const kgs = lugEntry?.kgs ?? row.luggageKgs ?? 0;
+                          const pay = lugEntry?.paymentMethod ?? row.luggagePaymentMethod ?? '';
+                          const lugAmt = Math.round((Number(kgs) || 0) * luggagePricePerKg);
+                          return (
+                            <TableRow key={String(row._id)}>
+                              <TableCell className="font-mono text-xs">
+                                {row.rowKind === 'extra' ? (
+                                  <Badge variant="secondary">MANIFEST</Badge>
+                                ) : (
+                                  row.bookingId
                                 )}
-                                {booking.returnSeat && (
-                                  <Badge variant="secondary">{booking.returnSeat}</Badge>
+                              </TableCell>
+                              <TableCell className="font-medium whitespace-nowrap">
+                                {row.firstName} {row.middleName || ''} {row.lastName}
+                              </TableCell>
+                              <TableCell className="text-sm">{row.phone || '—'}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{row.to || 'N/A'}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {row.tripSeat || row.returnSeat || '—'}
+                              </TableCell>
+                              <TableCell>₦{(Number(row.amount) || 0).toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  className="h-8 w-20"
+                                  value={kgs || ''}
+                                  disabled={currentManifestTrip?.isLocked}
+                                  onChange={(e) =>
+                                    updateLuggageForPassenger(row, {
+                                      kgs: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={pay || '__none__'}
+                                  onValueChange={(v) =>
+                                    updateLuggageForPassenger(row, {
+                                      paymentMethod:
+                                        v === 'cash' ? 'cash' : v === 'transfer' ? 'transfer' : '',
+                                    })
+                                  }
+                                  disabled={currentManifestTrip?.isLocked}
+                                >
+                                  <SelectTrigger className="h-8 w-[130px]">
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">—</SelectItem>
+                                    <SelectItem value="cash">Cash</SelectItem>
+                                    <SelectItem value="transfer">Transfer</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground whitespace-nowrap">
+                                ₦{lugAmt.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Checkbox
+                                  checked={row.onBoarded || false}
+                                  disabled={currentManifestTrip?.isLocked}
+                                  onCheckedChange={(checked) =>
+                                    handleUpdateOnBoarded(row, checked as boolean)
+                                  }
+                                  className="mx-auto"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {row.rowKind === 'extra' ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                    disabled={currentManifestTrip?.isLocked}
+                                    onClick={() => handleRemoveExtraPassenger(row.localId)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Remove from manifest only"
+                                    disabled={currentManifestTrip?.isLocked}
+                                    onClick={() => handleRemoveBookingFromManifest(String(row._id))}
+                                  >
+                                    <UserMinus className="h-4 w-4" />
+                                  </Button>
                                 )}
-                                {!booking.tripSeat && !booking.returnSeat && (
-                                  <span className="text-muted-foreground text-sm">N/A</span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div className="font-medium">
-                                  {booking.emergencyFirstName} {booking.emergencyLastName}
-                                </div>
-                                <div className="text-muted-foreground">{booking.emergencyPhone}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Checkbox
-                                checked={booking.onBoarded || false}
-                                onCheckedChange={(checked) => handleUpdateOnBoarded(booking._id, checked as boolean)}
-                                className="mx-auto"
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
                 )}
+
+                {excludedBookingsPreview.length > 0 && (
+                  <div className="rounded-md border border-dashed p-3 text-sm">
+                    <p className="font-medium mb-2">Excluded from manifest (bookings unchanged)</p>
+                    <ul className="space-y-1">
+                      {excludedBookingsPreview.map((ex) => (
+                        <li key={ex._id} className="flex flex-wrap justify-between gap-2 items-center">
+                          <span>
+                            {ex.bookingId} — {ex.firstName} {ex.lastName}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={currentManifestTrip?.isLocked}
+                            onClick={() => handleRestoreExcludedBooking(ex._id)}
+                          >
+                            Restore
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Waybills */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center gap-2">
+                  <div>
+                    <CardTitle className="text-lg">Waybills</CardTitle>
+                    <CardDescription>Same per-kg rate as luggage. Save manifest to persist.</CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={currentManifestTrip?.isLocked}
+                    onClick={() =>
+                      setManifestWaybills((w) => [
+                        ...w,
+                        {
+                          localId:
+                            typeof crypto !== 'undefined' && crypto.randomUUID
+                              ? crypto.randomUUID()
+                              : `wb_${Date.now()}`,
+                          label: '',
+                          kgs: 0,
+                          paymentMethod: '',
+                        },
+                      ])
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add waybill
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {manifestWaybills.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No waybills yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {manifestWaybills.map((w) => (
+                      <div key={w.localId} className="flex flex-wrap gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Label</Label>
+                          <Input
+                            className="h-9 w-40"
+                            value={w.label}
+                            disabled={currentManifestTrip?.isLocked}
+                            onChange={(e) =>
+                              setManifestWaybills((prev) =>
+                                prev.map((x) =>
+                                  x.localId === w.localId ? { ...x, label: e.target.value } : x
+                                )
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Kg</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-9 w-24"
+                            value={w.kgs || ''}
+                            disabled={currentManifestTrip?.isLocked}
+                            onChange={(e) =>
+                              setManifestWaybills((prev) =>
+                                prev.map((x) =>
+                                  x.localId === w.localId
+                                    ? { ...x, kgs: parseFloat(e.target.value) || 0 }
+                                    : x
+                                )
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Payment</Label>
+                          <Select
+                            value={w.paymentMethod || '__none__'}
+                            onValueChange={(v) =>
+                              setManifestWaybills((prev) =>
+                                prev.map((x) =>
+                                  x.localId === w.localId
+                                    ? {
+                                        ...x,
+                                        paymentMethod:
+                                          v === 'cash' ? 'cash' : v === 'transfer' ? 'transfer' : '',
+                                      }
+                                    : x
+                                )
+                              )
+                            }
+                            disabled={currentManifestTrip?.isLocked}
+                          >
+                            <SelectTrigger className="h-9 w-[130px]">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">—</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="transfer">Transfer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="text-sm pb-2 text-muted-foreground">
+                          ₦{Math.round((Number(w.kgs) || 0) * luggagePricePerKg).toLocaleString()}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          disabled={currentManifestTrip?.isLocked}
+                          onClick={() =>
+                            setManifestWaybills((prev) => prev.filter((x) => x.localId !== w.localId))
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Totals */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Totals</CardTitle>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Booking fare (listed)</p>
+                  <p className="font-semibold text-lg">₦{manifestTotalsLocal.fareSum.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Luggage ({manifestTotalsLocal.luggageKgs} kg)</p>
+                  <p className="font-semibold text-lg">₦{manifestTotalsLocal.luggageAmt.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Waybills ({manifestTotalsLocal.waybillKgs} kg)</p>
+                  <p className="font-semibold text-lg">₦{manifestTotalsLocal.waybillAmt.toLocaleString()}</p>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3 pt-2 border-t">
+                  <p className="text-muted-foreground">Grand total (fare + luggage + waybills)</p>
+                  <p className="font-bold text-xl">₦{manifestTotalsLocal.grand.toLocaleString()}</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -1678,6 +2265,73 @@ export function TripsClient() {
               </Card>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addPassengerOpen} onOpenChange={setAddPassengerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add manifest-only passenger</DialogTitle>
+            <DialogDescription>
+              Does not create a booking—used when a passenger moved from another bus.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label>First name *</Label>
+                <Input
+                  value={newExtraForm.firstName}
+                  onChange={(e) => setNewExtraForm({ ...newExtraForm, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Last name *</Label>
+                <Input
+                  value={newExtraForm.lastName}
+                  onChange={(e) => setNewExtraForm({ ...newExtraForm, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input
+                value={newExtraForm.phone}
+                onChange={(e) => setNewExtraForm({ ...newExtraForm, phone: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label>From</Label>
+                <Input
+                  value={newExtraForm.from}
+                  onChange={(e) => setNewExtraForm({ ...newExtraForm, from: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>To</Label>
+                <Input
+                  value={newExtraForm.to}
+                  onChange={(e) => setNewExtraForm({ ...newExtraForm, to: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Seat</Label>
+              <Input
+                value={newExtraForm.seat}
+                onChange={(e) => setNewExtraForm({ ...newExtraForm, seat: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setAddPassengerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleAddManifestPassenger}>
+              Add to manifest
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

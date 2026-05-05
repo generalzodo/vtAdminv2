@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DataTable, Column } from '@/components/admin/data-table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,6 +58,8 @@ export function PricesTab() {
   const [allPrices, setAllPrices] = useState<Price[]>([]);
   const [originFilter, setOriginFilter] = useState<string>('');
   const [destinationFilter, setDestinationFilter] = useState<string>('');
+  const [luggagePricePerKg, setLuggagePricePerKg] = useState('120');
+  const [luggageSaving, setLuggageSaving] = useState(false);
   const { toast } = useToast();
 
   // Extract unique origins and destinations for filter dropdowns
@@ -65,6 +68,21 @@ export function PricesTab() {
 
   useEffect(() => {
     fetchPrices();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/settings');
+        const data = await res.json();
+        const s = data.data ?? data;
+        if (s?.luggagePricePerKg != null && !Number.isNaN(Number(s.luggagePricePerKg))) {
+          setLuggagePricePerKg(String(s.luggagePricePerKg));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -205,6 +223,39 @@ export function PricesTab() {
     }
   };
 
+  const handleSaveLuggagePrice = async () => {
+    const n = parseFloat(luggagePricePerKg);
+    if (!Number.isFinite(n) || n < 0) {
+      toast({
+        title: 'Invalid value',
+        description: 'Enter a valid non-negative amount (₦ per kg)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setLuggageSaving(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ luggagePricePerKg: n }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Failed to save');
+      }
+      toast({ title: 'Saved', description: 'Manifest luggage rate updated.' });
+    } catch (e: unknown) {
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'Failed to save',
+        variant: 'destructive',
+      });
+    } finally {
+      setLuggageSaving(false);
+    }
+  };
+
   const columns: Column<Price>[] = [
     { key: 'origin', header: 'Origin' },
     { key: 'destination', header: 'Destination' },
@@ -233,6 +284,31 @@ export function PricesTab() {
           <p className="text-muted-foreground">Manage prices for routes</p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Manifest — luggage &amp; waybills</CardTitle>
+          <CardDescription>
+            Amount is computed as kg × this rate on each trip manifest (not editable per line).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-4">
+          <div className="space-y-2">
+            <Label>Luggage / waybill rate (₦ per kg)</Label>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              className="w-[180px]"
+              value={luggagePricePerKg}
+              onChange={(e) => setLuggagePricePerKg(e.target.value)}
+            />
+          </div>
+          <Button type="button" onClick={handleSaveLuggagePrice} disabled={luggageSaving}>
+            {luggageSaving ? 'Saving…' : 'Save rate'}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Origin and Destination Filters */}
       <div className="flex flex-wrap gap-4 items-end">
