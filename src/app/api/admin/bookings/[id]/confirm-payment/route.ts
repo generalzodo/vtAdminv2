@@ -21,17 +21,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 });
     }
 
+    // Forward the request body (e.g. { manualOverride: true }) to the backend.
+    const body = await request.json().catch(() => ({}));
+
     const response = await fetch(`${API_BASE_URL}booking/confirmPayment/${id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to confirm payment' }));
-      return NextResponse.json({ error: error.error || 'Failed to confirm payment' }, { status: response.status });
+      const error = await response
+        .json()
+        .catch(() => ({ error: 'Failed to confirm payment' }));
+      // Pass through the gateway status/message so the UI can explain why it was rejected.
+      return NextResponse.json(
+        {
+          error: error.error || 'Failed to confirm payment',
+          message: error.message,
+          gatewayStatus: error.gatewayStatus,
+          referenceUsed: error.referenceUsed,
+        },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();

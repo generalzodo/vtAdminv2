@@ -1860,6 +1860,7 @@ export function TripsClient() {
                           <TableHead className="min-w-[100px]">Booking ID</TableHead>
                           <TableHead className="min-w-[140px]">Passenger</TableHead>
                           <TableHead className="min-w-[100px]">Phone</TableHead>
+                          <TableHead className="min-w-[100px]">From</TableHead>
                           <TableHead className="min-w-[100px]">To</TableHead>
                           <TableHead className="min-w-[80px]">Seat</TableHead>
                           <TableHead className="min-w-[120px]">Fare</TableHead>
@@ -1880,6 +1881,14 @@ export function TripsClient() {
                           const kgs = lugEntry?.kgs ?? row.luggageKgs ?? 0;
                           const pay = lugEntry?.paymentMethod ?? row.luggagePaymentMethod ?? '';
                           const lugAmt = Math.round((Number(kgs) || 0) * luggagePricePerKg);
+                          const isReturnLeg =
+                            !!row.returnTrip &&
+                            String(row.returnTrip) === String(currentManifestTrip?._id);
+                          const fromVal = isReturnLeg ? row.to : row.from;
+                          const toVal = isReturnLeg ? row.from : row.to;
+                          const seatVal = isReturnLeg
+                            ? row.returnSeat || row.tripSeat
+                            : row.tripSeat || row.returnSeat;
                           return (
                             <TableRow key={String(row._id)}>
                               <TableCell className="font-mono text-xs">
@@ -1894,10 +1903,13 @@ export function TripsClient() {
                               </TableCell>
                               <TableCell className="text-sm">{row.phone || '—'}</TableCell>
                               <TableCell>
-                                <Badge variant="outline">{row.to || 'N/A'}</Badge>
+                                <Badge variant="outline">{fromVal || 'N/A'}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{toVal || 'N/A'}</Badge>
                               </TableCell>
                               <TableCell className="text-sm">
-                                {row.tripSeat || row.returnSeat || '—'}
+                                {seatVal || '—'}
                               </TableCell>
                               <TableCell>₦{(Number(row.amount) || 0).toLocaleString()}</TableCell>
                               <TableCell>

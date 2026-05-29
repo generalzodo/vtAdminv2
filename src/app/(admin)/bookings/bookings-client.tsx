@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -99,6 +100,9 @@ export function BookingsClient() {
   const [verifyingBooking, setVerifyingBooking] = useState<Booking | null>(null);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  // When the provider can't confirm payment, the admin may explicitly record an
+  // out-of-band (cash/transfer) payment as "admin paid".
+  const [manualOverride, setManualOverride] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const dateFilter = [
@@ -694,8 +698,10 @@ export function BookingsClient() {
     try {
       const response = await fetch(`/api/admin/bookings/${verifyingBooking._id}/confirm-payment`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualOverride }),
       });
-      
+
       const data = await response.json();
       if (response.ok && data.success) {
         toast({
@@ -704,7 +710,18 @@ export function BookingsClient() {
         });
         setVerifyPaymentDialogOpen(false);
         setVerifyingBooking(null);
+        setManualOverride(false);
         fetchBookings(page, limit);
+      } else if (response.status === 409) {
+        // Provider did not confirm payment. Keep the dialog open so the admin can
+        // decide whether to record an out-of-band payment via the override.
+        toast({
+          title: 'Payment not confirmed by provider',
+          description:
+            data.message ||
+            `Provider status: ${data.gatewayStatus || 'unknown'}. This booking was NOT marked as paid.`,
+          variant: 'destructive',
+        });
       } else {
         throw new Error(data.error || 'Failed to confirm payment');
       }
@@ -1578,7 +1595,13 @@ export function BookingsClient() {
       </Dialog>
 
       {/* Verify Payment Dialog */}
-      <Dialog open={verifyPaymentDialogOpen} onOpenChange={setVerifyPaymentDialogOpen}>
+      <Dialog
+        open={verifyPaymentDialogOpen}
+        onOpenChange={(open) => {
+          setVerifyPaymentDialogOpen(open);
+          if (!open) setManualOverride(false);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Verify Payment</DialogTitle>
@@ -1610,20 +1633,49 @@ export function BookingsClient() {
                 <p className="text-sm text-yellow-800">
                   Clicking "Confirm Payment" will:
                   <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Update payment status to "success"</li>
-                    <li>Change booking status to "pending"</li>
-                    <li>Generate and send ticket email to passenger</li>
+                    <li>Re-verify the transaction directly with the payment provider</li>
+                    <li>Only mark it "success" if the provider confirms the payment</li>
+                    <li>Change booking status to "pending" and email the ticket</li>
                   </ul>
+                  If the provider does not confirm the payment, it will be rejected.
                 </p>
+              </div>
+              <div className="flex items-start gap-2 rounded border border-red-200 bg-red-50 p-3">
+                <Checkbox
+                  id="manual-override"
+                  checked={manualOverride}
+                  onCheckedChange={(checked) => setManualOverride(checked === true)}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="manual-override" className="text-sm font-normal text-red-800">
+                  Record as "admin paid" without provider confirmation. Only use this for
+                  genuine out-of-band payments (cash/transfer). This is logged against your
+                  account.
+                </Label>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setVerifyPaymentDialogOpen(false)} disabled={confirmingPayment}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVerifyPaymentDialogOpen(false);
+                setManualOverride(false);
+              }}
+              disabled={confirmingPayment}
+            >
               Cancel
             </Button>
-            <Button onClick={handleConfirmPayment} disabled={confirmingPayment}>
-              {confirmingPayment ? 'Confirming...' : 'Confirm Payment & Send Ticket'}
+            <Button
+              onClick={handleConfirmPayment}
+              disabled={confirmingPayment}
+              variant={manualOverride ? 'destructive' : 'default'}
+            >
+              {confirmingPayment
+                ? 'Confirming...'
+                : manualOverride
+                ? 'Record as Admin Paid'
+                : 'Verify & Confirm Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
