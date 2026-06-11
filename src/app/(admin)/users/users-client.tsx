@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus, Edit, Trash2 } from 'lucide-react';
+import { Download, Plus, Edit, Trash2, Wallet as WalletIcon } from 'lucide-react';
+import { UserWalletModal } from '@/components/user-wallet-modal';
 import { PermissionGate } from '@/components/auth/permission-gate';
 import {
   Dialog,
@@ -96,6 +97,9 @@ export function UsersClient() {
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  // Wallet inspection modal — opens contextually from the per-row "Wallet" action.
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletUser, setWalletUser] = useState<User | null>(null);
   const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
   const [bulkStatusValue, setBulkStatusValue] = useState<string>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
@@ -363,9 +367,23 @@ export function UsersClient() {
 
   const actions = (row: User) => (
     <div className="flex gap-2">
+      <PermissionGate permission="wallet.view">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setWalletUser(row);
+            setWalletOpen(true);
+          }}
+          title="Inspect this user's wallet — balance, credit/debit history, audit trail"
+        >
+          <WalletIcon className="h-4 w-4 mr-1" />
+          Wallet
+        </Button>
+      </PermissionGate>
       <PermissionGate permission="users.edit">
-        <Button 
-          size="sm" 
+        <Button
+          size="sm"
           variant="default"
           onClick={() => handleOpenDialog(row)}
         >
@@ -373,8 +391,8 @@ export function UsersClient() {
         </Button>
       </PermissionGate>
       <PermissionGate permission="users.delete">
-        <Button 
-          size="sm" 
+        <Button
+          size="sm"
           variant="destructive"
           onClick={() => handleDeleteClick(row._id)}
         >
@@ -761,6 +779,16 @@ export function UsersClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Per-user wallet inspection modal (opens from per-row "Wallet" button). */}
+      <UserWalletModal
+        open={walletOpen}
+        onOpenChange={(o) => {
+          setWalletOpen(o);
+          if (!o) setWalletUser(null);
+        }}
+        user={walletUser}
+      />
     </div>
   );
 }
