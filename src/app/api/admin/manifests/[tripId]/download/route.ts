@@ -38,9 +38,26 @@ export async function GET(
       return NextResponse.json({ error: errorText || 'Failed to download manifest' }, { status: response.status });
     }
 
-    const contentType = response.headers.get('content-type') || (format === 'html' ? 'text/html; charset=utf-8' : 'text/csv; charset=utf-8');
-    const contentDisposition = response.headers.get('content-disposition')
-      || `attachment; filename="manifest_${tripId}.${format === 'html' ? 'html' : 'csv'}"`;
+    const fallbackContentType =
+      format === 'html'
+        ? 'text/html; charset=utf-8'
+        : format === 'png'
+        ? 'image/png'
+        : format === 'jpeg'
+        ? 'image/jpeg'
+        : 'text/csv; charset=utf-8';
+    const fallbackExt =
+      format === 'html'
+        ? 'html'
+        : format === 'png'
+        ? 'png'
+        : format === 'jpeg'
+        ? 'jpg'
+        : 'csv';
+    const contentType = response.headers.get('content-type') || fallbackContentType;
+    const contentDisposition =
+      response.headers.get('content-disposition') ||
+      `attachment; filename="manifest_${tripId}.${fallbackExt}"`;
 
     const body = await response.arrayBuffer();
     return new NextResponse(body, {

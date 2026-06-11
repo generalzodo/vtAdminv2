@@ -205,11 +205,22 @@ export function AuditLogsClient() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold">{log.action}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {log.userEmail} ({log.role || 'N/A'})
+                      <p className="text-sm">
+                        <span className="font-medium">
+                          {log.userName || log.userEmail}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          ({log.role || log.userType || 'N/A'})
+                        </span>
                       </p>
+                      {log.userName && log.userEmail && (
+                        <p className="text-xs text-muted-foreground">
+                          {log.userEmail}
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground">
-                        {log.entityType}: {log.entityId}
+                        {log.entityType}: {log.entityLabel || log.entityId}
                       </p>
                     </div>
                     <div className="text-right">

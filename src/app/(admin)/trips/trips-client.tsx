@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import html2canvas from 'html2canvas';
 import { DataTable, Column } from '@/components/admin/data-table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1099,20 +1098,30 @@ export function TripsClient() {
   };
 
   const handleExportManifestImage = async (mime: 'image/png' | 'image/jpeg') => {
-    if (!manifestExportRef.current || !currentManifestTrip?._id) return;
+    if (!currentManifestTrip?._id) return;
+    const format = mime === 'image/jpeg' ? 'jpeg' : 'png';
+    const ext = mime === 'image/jpeg' ? 'jpg' : 'png';
     try {
-      const canvas = await html2canvas(manifestExportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      const url = canvas.toDataURL(mime, mime === 'image/jpeg' ? 0.92 : undefined);
+      // Render server-side via the same HTML the `format=html` route produces.
+      // This guarantees the image looks identical to the printable HTML view —
+      // the old client-side html2canvas approach corrupted CSS variables,
+      // clipped at the modal's scroll container, and tainted CORS images.
+      const response = await fetch(
+        `/api/admin/manifests/${currentManifestTrip._id}/download?format=${format}&disposition=attachment`
+      );
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(body || `Failed to render image (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `manifest_${currentManifestTrip._id}.${mime === 'image/jpeg' ? 'jpg' : 'png'}`;
+      a.download = `manifest_${currentManifestTrip._id}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       toast({ title: 'Downloaded', description: 'Manifest image export ready.' });
     } catch (error: any) {
       toast({
