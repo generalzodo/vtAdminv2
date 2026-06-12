@@ -367,20 +367,18 @@ export function UsersClient() {
 
   const actions = (row: User) => (
     <div className="flex gap-2">
-      <PermissionGate permission="wallet.view">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setWalletUser(row);
-            setWalletOpen(true);
-          }}
-          title="Inspect this user's wallet — balance, credit/debit history, audit trail"
-        >
-          <WalletIcon className="h-4 w-4 mr-1" />
-          Wallet
-        </Button>
-      </PermissionGate>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setWalletUser(row);
+          setWalletOpen(true);
+        }}
+        title="Inspect this user's wallet — balance, credit/debit history, audit trail"
+      >
+        <WalletIcon className="h-4 w-4 mr-1" />
+        Wallet
+      </Button>
       <PermissionGate permission="users.edit">
         <Button
           size="sm"
