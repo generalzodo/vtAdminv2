@@ -214,11 +214,6 @@ export function AuditLogsClient() {
                           ({log.role || log.userType || 'N/A'})
                         </span>
                       </p>
-                      {log.userName && log.userEmail && (
-                        <p className="text-xs text-muted-foreground">
-                          {log.userEmail}
-                        </p>
-                      )}
                       <p className="text-sm text-muted-foreground">
                         {log.entityType}: {log.entityLabel || log.entityId}
                       </p>
